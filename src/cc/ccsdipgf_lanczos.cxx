@@ -71,6 +71,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             int na = vrt.nbeta[0];
             int nvec_lanczos; 
             CU value ;
+            CU value1 ;
+//          U value ;
+//          U value1 ;
 
 
             auto& T = this->template get<ExcitationOperator  <U,2>>("T");
@@ -111,7 +114,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
 
             auto& XE = this->puttmp("XE", new SpinorbitalTensor<U>("X(e)", arena, group, {vrt,occ}, {0,0}, {1,0}, isalpha ? -1 : 1));
-            auto& XEA = this->puttmp("XEA", new SpinorbitalTensor<U>("XA(e)", arena, group, {vrt,occ}, {0,0}, {1,0}, isalpha ? -1 : 1));
+            auto& XEA = this->puttmp("XEA", new SpinorbitalTensor<U>("XEA(e)", arena, group, {vrt,occ}, {0,0}, {1,0}, isalpha ? -1 : 1));
 //          auto& alpha = this-> puttmp("alpha", new vector<unique_vector<U>>()) ;
 //          auto& beta  = this-> puttmp("beta", new vector<unique_vector<U>>())  ;
 //          auto& gamma = this-> puttmp("gamma", new  vector<unique_vector<U>>());
@@ -134,6 +137,12 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {isvrt, !isvrt}, {0,0}, isalpha ? 1 : -1);
 
             vector<tkv_pair<U>> pairs{{orbital, 1}};
+//           vector<tkv_pair<U>> pairs;
+
+//            for (int vec = 0; vec < nI; vec++) {
+//              pairs.push_back(tkv_pair<U>(vec, vec)) ;
+//            }
+
 
             CTFTensor<U>& tensor1 = ap({0,0}, {isvrt && isalpha, !isvrt && isalpha})({0});
             if (arena.rank == 0)
@@ -179,37 +188,51 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                  *  ab...    km      ab...     abm...
                  */
                 e(1)[  "i"]  =               apt["i"];
+
                 e(1)[  "i"] -=   Dij[  "im"]*apt["m"];
                 e(2)["ija"]  =  L(1)[  "ia"]*apt["j"];
                 e(2)["ija"] -= Gijak["ijam"]*apt["m"];
             }
 
-
-            //printf("<E|E>: %.15f\n", scalar(e*e));
+//            printf("<E|E>: %.15f\n", scalar(e*e));
             //printf("<B|B>: %.15f\n", scalar(b*b));
-            //printf("<E|B>: %.15f\n", scalar(e(1)["m"]*b(1)["m"])+0.5*scalar(e(2)["mne"]*b(2)["emn"]));
+            printf("<E|B>: %.15f\n", scalar(e(1)["m"]*b(1)["m"])+0.5*scalar(e(2)["mne"]*b(2)["emn"]));
 
               auto& D = this->puttmp("D", new Denominator<U>(H));
            
               int number_of_vectors = nI*nI*nA + nI ; 
               this->puttmp("lanczos", new Lanczos<U,X>(lanczos_config,number_of_vectors));
 
+             /* Evaluate norm 
+              */ 
+
               RL = b;
               LL = e;
   
-              U norm = sqrt(scalar(LL*RL)); 
+              U norm = sqrt(aquarius::abs(scalar(LL*RL))); 
               RL /= norm;
               LL /= norm;
-
-             /* Evaluate norm 
-              */ 
 
               Nij["ij"] = e(1)[  "i"]*b(1)[  "j"]  ;
               Nij["ij"] -= e(2)["ime"]*b(2)["ejm"];
 
+
+             vector<U> temp1;
+
+              Nij({0,1},{0,1})({0,0}).getAllData(temp1);
+
+            for (int ii = 0 ; ii< temp1.size(); ii++){
+             printf("print values of Nij : %.10f \n",temp1[ii]);
+           }
+
               Iterative<U>::run(dag, arena);
 
               nvec_lanczos = alpha.size() ; 
+
+              printf("print norm: %10f\n", norm);
+
+              beta.emplace_back(0.) ;
+              gamma.emplace_back(0.) ;
 
             for (auto& o : omegas)
             {
@@ -218,14 +241,33 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              */
 
               value = {0.,0.} ;
+              value1 = {1.,0.} ;
+//             value = 0. ;
+//             value1 = 1. ;
 
-             for(int i=(nvec_lanczos-1);i >= 0;--i){  
-              value = (1.0,0.0)/(o - alpha[i] - beta[i+1]*gamma[i+1]*value) ;                 
-             }
-             
+              CU alpha_temp ;
+              CU beta_temp ;
+              CU gamma_temp ;
+              CU com_one(1.,0.) ;
+
              this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
 
-              }
+             for(int i=(nvec_lanczos-1);i >= 0;i--){  
+              alpha_temp = {alpha[i],0.} ;
+              beta_temp = {beta[i+1],0.} ;
+              gamma_temp = {gamma[i+1],0.} ;
+
+//              value = (1.0)/(o.real() - alpha[i] - beta[i+1]*gamma[i+1]*value1) ;                 
+              value = (com_one)/(o + alpha_temp + beta_temp*gamma_temp*value1) ;                 
+              value1 = value ;
+             }
+
+              printf("realvalue at least: %.15f\n", value.real()*norm*norm);
+              printf("imaginary value at least: %.15f\n", value.imag()*norm*norm);
+
+//              Nij = value*Nij ;
+//              printf("value: %.15f\n", value);
+             }
 
             return true;
         }
@@ -249,7 +291,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             auto& XEA = this->template gettmp<SpinorbitalTensor<U>>("XEA");
 
             auto& D = this->template gettmp<Denominator<U>>("D");
-//            auto& lanczos = this->template gettmp<Lanczos<unique_vector<U>>>("lanczos");
+//           auto& lanczos = this->template gettmp<Lanczos<unique_vector<U>>>("lanczos");
 //           auto& lanczos = this->template gettmp<Lanczos<ExcitationOperator<U,1,2>>>("lanczos");
             auto& lanczos = this->template gettmp<Lanczos<U,X>>("lanczos");
 
@@ -269,13 +311,15 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             auto& gamma = this->template gettmp<unique_vector<U>> ("gamma");
 
             printf("<RL|RL>: %.15f\n", scalar(RL*RL));
+            printf("<LL1|LL1>: %.15f\n", scalar(LL(1)["m"]*LL(1)["m"]));
+            printf("<LL|LL>: %.15f\n", scalar(LL*LL));
             printf("<LL|RL>: %.15f\n", scalar(LL*RL));
             //printf("<Rr|Ri>: %.15f\n", scalar(Rr*Ri));
 
             //printf("<B|Rr>: %.15f\n", scalar(b*Rr));
             //printf("<B|Ri>: %.15f\n", scalar(b*Ri));
 
-                  XE[  "e"]  = -0.5*WMNEF["mnfe"]*RL(2)[ "fmn"];
+                XE[  "e"]  = -0.5*WMNEF["mnfe"]*RL(2)[ "fmn"];
 
                 Z(1)[  "i"]  =       -FMI[  "mi"]*RL(1)[   "m"];
                 Z(1)[  "i"] +=        FME[  "me"]*RL(2)[ "emi"];
@@ -291,19 +335,25 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
           /*Left hand matrix-vector product : Q^T Hbar
            *We will use Y array for the left hand residual..   
            */ 
-                XEA[  "e"]  = -0.5*T(2)["efmn"]*LL(2)["mnf"];
+                XEA[  "e"]  = -0.5*T(2)["efnm"]*LL(2)["mnf"];
 
-                Y(1)[  "i"] -=       FMI[  "im"]*LL(1)[  "m"];
+                Y(1)[  "i"] =       -FMI[  "im"]*LL(1)[  "m"];
                 Y(1)[  "i"] -= 0.5*WAMIJ["eimn"]*LL(2)["mne"];
 
+                Y(2)["ija"]  =       FME[  "ia"]*LL(1)[  "j"];
                 Y(2)["ija"] +=       FAE[  "ea"]*LL(2)["ije"];
                 Y(2)["ija"] -=       FMI[  "im"]*LL(2)["mja"];
                 Y(2)["ija"] += 0.5*WMNIJ["ijmn"]*LL(2)["mna"];
+                Y(2)["ija"] -=     WMNEJ["ijam"]*LL(1)[  "m"];
+                Y(2)["ija"] +=       XEA[  "e"]*WMNEF["ijae"];
+                Y(2)["ija"] -=     WAMEI["eiam"]*LL(2)["mje"];
 
-                Y(2)["ija"] +=       XEA[  "e"]*WMNEF["ijeb"];
-
-            printf("<Z(2)|Z(2)>: %.15f\n", scalar(Z(2)*Z(2)));
+            printf("<Z1|Z1>: %.15f\n", scalar(Z(1)*Z(1)));
+            printf("<Z2|Z2>: %.15f\n", 0.5*scalar(Z(2)*Z(2)));
+            printf("<Z|Z>: %.15f\n", scalar(Z*Z));
             printf("<Y1|Y1>: %.15f\n", scalar(Y(1)*Y(1)));
+            printf("<Y2|Y2>: %.15f\n",0.5* scalar(Y(2)*Y(2)));
+            printf("<Y|Y>: %.15f\n", scalar(Y*Y));
             //printf("<Z2|Z2>: %.15f\n", 0.5*scalar(Z(2)*Z(2)));
             //printf("<Z|Z>: %.15f\n", scalar(Z*Z));
             //printf("<Zi|Zi>: %.15f\n", scalar(Zi*Zi));

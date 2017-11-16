@@ -35,10 +35,8 @@ class Lanczos : public task::Destructible
 //        typedef typename T::dtype U;
         typedef T U;
         typedef complex_type_t<U> CU;
-        unique_vector<T> old_c_r;
-        unique_vector<T> old_c_l;
-        unique_vector<T> old_hc_r;
-        unique_vector<T> old_hc_l;
+        unique_vector<ExcitationOperator<T,1,2>> old_c_r;
+        unique_vector<DeexcitationOperator<V,1,2>> old_c_l;
         vector<T> new_c;
         vector<T> new_hc;
 //        unique_ptr<ExcitationOperator<T,1,2>> rhs;
@@ -68,52 +66,14 @@ class Lanczos : public task::Destructible
         void addVectors(const op::ExcitationOperator  <T,1,2>& c_r, const op::DeexcitationOperator  <V,1,2>& c_l)
         {
             nextrap++;
-            vector<U> temp1;
-            vector<U> temp2;
-            vector<U> temp3;
 
+            old_c_r.clear();
+            old_c_l.clear();
 
-            temp1.clear();
-            temp2.clear(); 
-            temp3.clear(); 
+            old_c_r.emplace_back(c_r);
+            old_c_l.emplace_back(c_l);
 
-            c_r(1)({0,0},{0,1})({0}).getAllData(temp1);
-            c_r(2)({0,0},{0,1})({0,0,0}).getAllData(temp2);
-            c_r(2)({1,0},{0,2})({0,0,0}).getAllData(temp3);
-
-            old_c_r.clear() ;
-
-           for (int ii = 0 ; ii< temp1.size(); ii++){
-             old_c_r.emplace_back(temp1[ii]);
-           }
-            for (int ii = 0 ; ii< temp2.size(); ii++){
-             old_c_r.emplace_back(temp2[ii]);
-           }
-
-            for (int ii = 0 ; ii< temp3.size(); ii++){
-             old_c_r.emplace_back(temp3[ii]);
-           }
-
-            temp1.clear();
-            temp2.clear(); 
-            temp3.clear(); 
-
-             c_l(1)({0,1},{0,0})({0}).getAllData(temp1);
-             c_l(2)({0,1},{0,0})({0}).getAllData(temp2);
-             c_l(2)({0,2},{1,0})({0}).getAllData(temp3);
-
-            old_c_l.clear() ;
-
-            for (int ii = 0 ; ii< temp1.size(); ii++){
-             old_c_l.emplace_back(temp1[ii]);
-           }
-            for (int ii = 0 ; ii< temp2.size(); ii++){
-             old_c_l.emplace_back(temp2[ii]);
-           }
-
-            for (int ii = 0 ; ii< temp3.size(); ii++){
-             old_c_l.emplace_back(temp3[ii]);
-           }
+            printf("scalar product rhs: %.10f \n",scalar(old_c_r[0]*old_c_r[0]));
         }
 
         void getRoot(T& c_r, T& c_i, T& hc_r, T& hc_i)
@@ -161,202 +121,92 @@ class Lanczos : public task::Destructible
             /* calculate alpha(i) = pT(i)hc_rq(i)
              */ 
 
-            alpha.push_back(scalar(c_l*hc_r)) ;             
+            alpha.push_back(scalar(conj(c_l)*hc_r)) ;             
 
             /*copy array to a vector 
              */
 
-             vector<U> temp1;
-             vector<U> temp2;
-             vector<U> temp3;
+            /*do some printing
+             */   
+            
+//           vector<U> temp1;
+//           vector<U> temp2;
+//           vector<U> temp3;
 
-             temp1.clear() ;
-             temp2.clear() ;
-             temp3.clear() ;
+//           temp1.clear() ;
+//           temp2.clear() ;
+//           temp3.clear() ;
 
-            double sum1 = 0.0 ;
-             new_c.clear() ; 
-             new_hc.clear() ; 
-             hc_r(1)({0,0},{0,1})({0}).getAllData(temp1);
-             hc_r(2)({0,0},{0,1})({0,0,0}).getAllData(temp2);
-             hc_r(2)({1,0},{0,2})({0,0,0}).getAllData(temp3);
+//           hc_r(1)({0,0},{0,1})({0}).getAllData(temp1);
+//           hc_r(2)({0,0},{0,1})({0,0,0}).getAllData(temp2);
+//           hc_r(2)({1,0},{0,2})({0,0,0}).getAllData(temp3);
 
-            for (int ii = 0 ; ii< temp1.size(); ii++){
-             new_hc.emplace_back(temp1[ii]);
-           }
-            for (int ii = 0 ; ii< temp2.size(); ii++){
-             new_hc.emplace_back(temp2[ii]);
-           }
-
-            for (int ii = 0 ; ii< temp3.size(); ii++){
-             new_hc.emplace_back(temp3[ii]);
-           }
-             sum1 = c_ddot (temp2.size(), &temp2[0], 1, &temp2[0], 1) ; 
-//             sum1 += c_ddot (temp3.size(), &temp3[0], 1, &temp3[0], 1) ; 
-
-             printf("print explicit sum of hc_r : %.10f \n",sum1);
-
-             int vecsize= temp1.size() + temp2.size() + temp3.size() ; 
-
-             printf("print vecsize : %10d \n",temp2.size());
-             printf("print vecsize : %10d \n",nvec);
-
-             temp1.clear();
-             temp2.clear(); 
-             temp3.clear(); 
-
-             c_r(1)({0,0},{0,1})({0}).getAllData(temp1);
-             c_r(2)({0,0},{0,1})({0,0,0}).getAllData(temp2);
-             c_r(2)({1,0},{0,2})({0,0,0}).getAllData(temp3);
-
-            for (int ii = 0 ; ii< temp1.size(); ii++){
-             new_c.emplace_back(temp1[ii]);
-           }
-            for (int ii = 0 ; ii< temp2.size(); ii++){
-             new_c.emplace_back(temp2[ii]);
-           }
-
-            for (int ii = 0 ; ii< temp3.size(); ii++){
-             new_c.emplace_back(temp2[ii]);
-           }
+//          for (int ii = 0 ; ii< temp1.size(); ii++){
+//           printf("print values of c_r(1) : %.10f \n",temp1[ii]);
+//         }
+//          for (int ii = 0 ; ii< temp2.size(); ii++){
+//           printf("print values of c_r(2) : %.10f \n",temp2[ii]);
+//         }
+//          for (int ii = 0 ; ii< temp3.size(); ii++){
+//           printf("print values of c_r(2) : %.10f \n",temp3[ii]);
+//         }
 
              double temp = alpha[nextrap] ;
 
-             printf("print <Z|Z>: %.10f \n",scalar(hc_r(2)*hc_r(2)));
+             unique_vector<ExcitationOperator<T,1,2>> r;
+             unique_vector<DeexcitationOperator<V,1,2>> s;
 
-             printf("print nextrap: %10d \n",temp1.size());
-             printf("print nextrap: %10d \n",temp2.size());
-             printf("print nextrap: %10d \n",temp3.size());
-
-            vector<double> r(vecsize); 
-            vector<double> s(vecsize); 
+//            vector<double> r(vecsize); 
+//            vector<double> s(vecsize); 
 
             /* calculate r = hc_r - gamma(i-1)q(i-1) - alpha(i)q(i)
              */
 
-           if (nextrap > 0) {
+           r.clear() ;
+           s.clear() ;
 
-           for (int vec = 0; vec < vecsize; vec++) {
-              r[vec] = new_hc[vec] - temp*new_c[vec] - gamma[nextrap-1]*old_c_r[vec]  ; 
-            }
+           if (nextrap > 0) {
+             r.emplace_back(hc_r) ;
+             r[0] -= temp*c_r ;
+             r[0] -= gamma[nextrap-1]*old_c_r[0] ;
            }else{
-            for (int vec = 0; vec < vecsize; vec++) {
-              r[vec] = new_hc[vec] - temp*new_c[vec] ; 
-            }
+             r.emplace_back(hc_r) ;
+             r[0] -= temp*c_r ;
           }
+             printf("print current c_r: %.10f \n",scalar(c_r*c_r));
+             if (nextrap > 0) printf(" old c_r: %.10f \n",scalar(old_c_r[0]*old_c_r[0]));
+             printf("print <hc_r|hc_r>: %.10f \n",scalar(hc_r*hc_r));
 
             /* calculate s = hc_l - beta(i-1)pT(i-1) - alpha(i)pT(i)
              */
 
-            new_c.clear() ; 
+            if (nextrap > 0) {
+             s.emplace_back(hc_l) ;
+             s[0] -= temp*c_l ;
+             s[0] -= beta[nextrap-1]*old_c_l[0] ;
+           }else{
+             s.emplace_back(hc_l) ;
+             s[0] -= temp*c_l ;
+          }
 
-            temp1.clear();
-            temp2.clear(); 
-            temp3.clear(); 
+             printf("print <s|s>: %.10f \n",scalar(s[0]*s[0]));
 
-             c_l(1)({0,1},{0,0})({0}).getAllData(temp1);
-             c_l(2)({0,1},{0,0})({0,0,0}).getAllData(temp2);
-             c_l(2)({0,2},{1,0})({0,0,0}).getAllData(temp3);
-
-
-            for (int ii = 0 ; ii< temp1.size(); ii++){
-             new_c.emplace_back(temp1[ii]);
-           }
-            for (int ii = 0 ; ii< temp2.size(); ii++){
-             new_c.emplace_back(temp2[ii]);
-           }
-            for (int ii = 0 ; ii< temp3.size(); ii++){
-             new_c.emplace_back(temp3[ii]);
-           }
-
-            new_hc.clear() ; 
-
-            temp1.clear();
-            temp2.clear(); 
-            temp3.clear(); 
-
-             hc_l(1)({0,1},{0,0})({0}).getAllData(temp1);
-             hc_l(2)({0,1},{0,0})({0}).getAllData(temp2);
-             hc_l(2)({0,2},{1,0})({0,0,0}).getAllData(temp3);
-
-            for (int ii = 0 ; ii< temp1.size(); ii++){
-             new_hc.emplace_back(temp1[ii]);
-           }
-            for (int ii = 0 ; ii< temp2.size(); ii++){
-             new_hc.emplace_back(temp2[ii]);
-           }
-            for (int ii = 0 ; ii< temp3.size(); ii++){
-             new_hc.emplace_back(temp3[ii]);
-           }
-
-
-           if (nextrap > 0) {
-              for (int vec = 0; vec < vecsize; vec++) {
-                s[vec] = new_hc[vec] - temp*new_c[vec] - beta[nextrap-1] * old_c_l[vec] ; 
-              }
-           } else{
-              for (int vec = 0; vec < vecsize; vec++) {
-                s[vec] = new_hc[vec] - temp*new_c[vec] ; 
-              }
-            }
-
-             temp = c_ddot (vecsize, s.data(), 1, r.data(), 1) ; 
+             temp = scalar(conj(s[0])*r[0]) ; 
 
              beta.push_back (sqrt(aquarius::abs(temp))) ;
              gamma.push_back (temp/beta[nextrap])  ; 
 
-              addVectors(c_r, c_l);
+             printf("print beta: %.10f \n",beta[nextrap]);
+             printf("print gamma: %.10f \n",gamma[nextrap]);
 
-              vector<tkv_pair<double>> pairs;
-              for (int vec = 0; vec < temp1.size(); vec++) {
-                pairs.push_back(tkv_pair<double>(vec, r[vec]/beta[nextrap-1])) ;
-              }
+             addVectors(c_r, c_l);
 
-              c_r(1)({0,0},{0,1})({0}).writeRemoteData(pairs);
-
-              pairs.clear() ;
-
-              for (int vec = temp1.size(); vec < (temp1.size()+temp2.size()); vec++) {
-                pairs.push_back(tkv_pair<double>(vec-temp1.size(), r[vec]/beta[nextrap-1])) ;
-              }
-
-              c_r(2)({0,0},{0,1})({0}).writeRemoteData(pairs);
-
-              pairs.clear() ;
-
-              for (int vec = temp1.size()+temp2.size(); vec < (temp1.size()+temp2.size()+temp3.size()) ; vec++) {
-                pairs.push_back(tkv_pair<double>(vec-temp1.size()-temp2.size(), r[vec]/beta[nextrap-1])) ;
-              }
-
-              c_r(2)({1,0},{0,2})({0,0,0}).writeRemoteData(pairs);
-
-              pairs.clear() ;
-
-              for (int vec = 0; vec < temp1.size(); vec++) {
-                pairs.push_back(tkv_pair<double>(vec, s[vec]/gamma[nextrap-1])) ;
-              }
-
-              c_l(1)({0,1},{0,0})({0}).writeRemoteData(pairs);
-        
-              pairs.clear() ;
-
-              for (int vec = temp1.size(); vec < (temp1.size()+temp2.size()); vec++) {
-                pairs.push_back(tkv_pair<double>(vec-temp1.size(), s[vec]/gamma[nextrap-1])) ;
-              }
-
-              c_l(2)({0,1},{0,0})({0}).writeRemoteData(pairs);
-
-              pairs.clear() ;
-
-              for (int vec = (temp1.size()+temp2.size()); vec < (temp1.size()+temp2.size()+temp3.size()); vec++) {
-                pairs.push_back(tkv_pair<double>(vec-temp1.size()-temp2.size(), s[vec]/gamma[nextrap-1])) ;
-              }
-
-               c_l(2)({0,2},{1,0})({0,0,0}).writeRemoteData(pairs);
-
+             c_l = s[0]/gamma[nextrap-1] ; 
+             c_r = r[0]/beta[nextrap-1] ; 
 
             printf("scalar product c_l: %.10f \n",scalar(c_l*c_l));
             printf("scalar product c_r: %.10f \n",scalar(c_r*c_r));
+
             printf("print nextrap: %10d \n",nextrap);
             printf("print alpha: %.10f \n",alpha[nextrap-1]);
             printf("print beta: %.10f \n",beta[nextrap-1]);
