@@ -72,9 +72,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             int nvec_lanczos; 
             CU value ;
             CU value1 ;
-//          U value ;
-//          U value1 ;
-
 
             auto& T = this->template get<ExcitationOperator  <U,2>>("T");
             auto& L = this->template get<DeexcitationOperator<U,2>>("L");
@@ -112,9 +109,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             auto& b  = this->puttmp("b",  new ExcitationOperator  <U,1,2>("b",  arena, occ, vrt, isalpha ? -1 : 1));
             auto& e  = this->puttmp("e",  new DeexcitationOperator<U,1,2>("e",  arena, occ, vrt, isalpha ? 1 : -1));
 
-
             auto& XE = this->puttmp("XE", new SpinorbitalTensor<U>("X(e)", arena, group, {vrt,occ}, {0,0}, {1,0}, isalpha ? -1 : 1));
-            auto& XEA = this->puttmp("XEA", new SpinorbitalTensor<U>("XEA(e)", arena, group, {vrt,occ}, {0,0}, {1,0}, isalpha ? -1 : 1));
+            auto& XEA = this->puttmp("XEA", new SpinorbitalTensor<U>("X(ea)", arena, group, {vrt,occ}, {1,0}, {0,0}, isalpha ? 1 : -1));
 //          auto& alpha = this-> puttmp("alpha", new vector<unique_vector<U>>()) ;
 //          auto& beta  = this-> puttmp("beta", new vector<unique_vector<U>>())  ;
 //          auto& gamma = this-> puttmp("gamma", new  vector<unique_vector<U>>());
@@ -194,9 +190,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                 e(2)["ija"] -= Gijak["ijam"]*apt["m"];
             }
 
-//            printf("<E|E>: %.15f\n", scalar(e*e));
+            //printf("<E|E>: %.15f\n", scalar(e*e));
             //printf("<B|B>: %.15f\n", scalar(b*b));
-            printf("<E|B>: %.15f\n", scalar(e(1)["m"]*b(1)["m"])+0.5*scalar(e(2)["mne"]*b(2)["emn"]));
+            //printf("<E|B>: %.15f\n", scalar(e(1)["m"]*b(1)["m"])+0.5*scalar(e(2)["mne"]*b(2)["emn"]));
 
               auto& D = this->puttmp("D", new Denominator<U>(H));
            
@@ -209,15 +205,17 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               RL = b;
               LL = e;
   
-              U norm = sqrt(aquarius::abs(scalar(LL*RL))); 
+//              U norm = sqrt(aquarius::abs(scalar(LL*RL))); 
+              U norm = sqrt(aquarius::abs(scalar(RL*LL))); 
               RL /= norm;
               LL /= norm;
 
               Nij["ij"] = e(1)[  "i"]*b(1)[  "j"]  ;
               Nij["ij"] -= e(2)["ime"]*b(2)["ejm"];
-
-
+             
              vector<U> temp1;
+
+              temp1.clear() ;
 
               Nij({0,1},{0,1})({0,0}).getAllData(temp1);
 
@@ -231,8 +229,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
               printf("print norm: %10f\n", norm);
 
-              beta.emplace_back(0.) ;
-              gamma.emplace_back(0.) ;
+            /*Define full trdiagonal matrix 
+             */  
+
 
             for (auto& o : omegas)
             {
@@ -240,29 +239,34 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             /*Evaluate continued fraction 
              */
 
-              value = {0.,0.} ;
+              value  = {0.,0.} ;
               value1 = {1.,0.} ;
-//             value = 0. ;
-//             value1 = 1. ;
+//            value = 0. ;
+//            value1 = 1. ;
 
               CU alpha_temp ;
               CU beta_temp ;
               CU gamma_temp ;
               CU com_one(1.,0.) ;
+//              o = {0.00785398163397,0.} ;
+              omega = {-o.real(),o.imag()} ;
 
              this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
 
              for(int i=(nvec_lanczos-1);i >= 0;i--){  
               alpha_temp = {alpha[i],0.} ;
-              beta_temp = {beta[i+1],0.} ;
-              gamma_temp = {gamma[i+1],0.} ;
+              beta_temp  = {beta[i],0.} ;
+              gamma_temp = {gamma[i],0.} ;
 
 //              value = (1.0)/(o.real() - alpha[i] - beta[i+1]*gamma[i+1]*value1) ;                 
-              value = (com_one)/(o + alpha_temp + beta_temp*gamma_temp*value1) ;                 
+              value = (com_one)/(-omega + alpha_temp + beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
+//            printf("beta value: %.15f\n", beta_temp.real());
+//            printf("real value at least: %.15f\n", value.real());
+//            printf("imaginary value at least: %.15f\n", value.imag());
              }
 
-              printf("realvalue at least: %.15f\n", value.real()*norm*norm);
+              printf("real value at least: %.15f\n", value.real()*norm*norm);
               printf("imaginary value at least: %.15f\n", value.imag()*norm*norm);
 
 //              Nij = value*Nij ;
@@ -297,8 +301,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
             auto& RL = this->template gettmp< ExcitationOperator<U,1,2>>("RL");
             auto& LL = this->template gettmp< DeexcitationOperator<U,1,2>>("LL");
-            auto& Z = this->template  gettmp<  ExcitationOperator<U,1,2>>("Z");
-            auto& Y = this->template  gettmp<  DeexcitationOperator<U,1,2>>("Y");
+            auto& Z  = this->template  gettmp<  ExcitationOperator<U,1,2>>("Z");
+            auto& Y  = this->template  gettmp<  DeexcitationOperator<U,1,2>>("Y");
             auto& b  = this->template gettmp<  ExcitationOperator<U,1,2>>("b");
             auto& e  = this->template gettmp<DeexcitationOperator<U,1,2>>("e");
 
@@ -319,7 +323,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             //printf("<B|Rr>: %.15f\n", scalar(b*Rr));
             //printf("<B|Ri>: %.15f\n", scalar(b*Ri));
 
-                XE[  "e"]  = -0.5*WMNEF["mnfe"]*RL(2)[ "fmn"];
+                XE[  "e"]    = -0.5*WMNEF["mnfe"]*RL(2)[ "fmn"];
 
                 Z(1)[  "i"]  =       -FMI[  "mi"]*RL(1)[   "m"];
                 Z(1)[  "i"] +=        FME[  "me"]*RL(2)[ "emi"];
@@ -337,7 +341,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
            */ 
                 XEA[  "e"]  = -0.5*T(2)["efnm"]*LL(2)["mnf"];
 
-                Y(1)[  "i"] =       -FMI[  "im"]*LL(1)[  "m"];
+                Y(1)[  "i"]  =       -FMI[  "im"]*LL(1)[  "m"];
                 Y(1)[  "i"] -= 0.5*WAMIJ["eimn"]*LL(2)["mne"];
 
                 Y(2)["ija"]  =       FME[  "ia"]*LL(1)[  "j"];
@@ -365,7 +369,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
             printf("have passed this step 1: %.10f\n", beta[beta.size()-1]);
 
-            this->conv() = max(beta[beta.size()-1], gamma[gamma.size()-1]);
+            this->conv() = max(pow(beta[beta.size()-1],2), pow(gamma[gamma.size()-1],2));
 
 //            lanczos.getSolution(alpha, beta, gamma);
         }
