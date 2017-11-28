@@ -37,10 +37,6 @@ class Lanczos : public task::Destructible
         typedef complex_type_t<U> CU;
         unique_vector<ExcitationOperator<T,1,2>> old_c_r;
         unique_vector<DeexcitationOperator<V,1,2>> old_c_l;
-        vector<T> new_c;
-        vector<T> new_hc;
-//        unique_ptr<ExcitationOperator<T,1,2>> rhs;
-//        unique_vector<ExcitationOperator<T,1,2>> rhs;
         vector<CU> b;
         marray<CU,2> e;
         int maxextrap, nextrap, nvec;
@@ -49,7 +45,6 @@ class Lanczos : public task::Destructible
 
         void parse(const input::Config& config)
         {
-            nextrap = 0;
             maxextrap = config.get<int>("order");
             continuous = config.get<string>("compaction") == "continuous";
         }
@@ -121,7 +116,8 @@ class Lanczos : public task::Destructible
             /* calculate alpha(i) = pT(i)hc_rq(i)
              */ 
 
-            alpha.push_back(scalar(conj(c_l)*hc_r)) ;             
+//             alpha.push_back(scalar(c_l*hc_r)) ;             
+             alpha.emplace_back(scalar(conj(hc_l)*c_r)) ;             
 
             /*copy array to a vector 
              */
@@ -129,17 +125,17 @@ class Lanczos : public task::Destructible
             /*do some printing
              */   
             
-//           vector<U> temp1;
-//           vector<U> temp2;
-//           vector<U> temp3;
+             vector<U> temp1;
+             vector<U> temp2;
+             vector<U> temp3;
 
-//           temp1.clear() ;
-//           temp2.clear() ;
-//           temp3.clear() ;
+             temp1.clear() ;
+             temp2.clear() ;
+             temp3.clear() ;
 
-//           hc_r(1)({0,0},{0,1})({0}).getAllData(temp1);
-//           hc_r(2)({0,0},{0,1})({0,0,0}).getAllData(temp2);
-//           hc_r(2)({1,0},{0,2})({0,0,0}).getAllData(temp3);
+             hc_r(1)({0,0},{0,1})({0}).getAllData(temp1);
+             hc_r(2)({0,0},{0,1})({0,0,0}).getAllData(temp2);
+             hc_r(2)({1,0},{0,2})({0,0,0}).getAllData(temp3);
 
 //          for (int ii = 0 ; ii< temp1.size(); ii++){
 //           printf("print values of c_r(1) : %.10f \n",temp1[ii]);
@@ -151,7 +147,7 @@ class Lanczos : public task::Destructible
 //           printf("print values of c_r(2) : %.10f \n",temp3[ii]);
 //         }
 
-             double temp = alpha[nextrap] ;
+             double temp ;
 
              unique_vector<ExcitationOperator<T,1,2>> r;
              unique_vector<DeexcitationOperator<V,1,2>> s;
@@ -162,39 +158,37 @@ class Lanczos : public task::Destructible
             /* calculate r = hc_r - gamma(i-1)q(i-1) - alpha(i)q(i)
              */
 
-           r.clear() ;
-           s.clear() ;
+             r.clear() ;
+             s.clear() ;
 
            if (nextrap > 0) {
              r.emplace_back(hc_r) ;
-             r[0] -= temp*c_r ;
+             r[0] -= alpha[nextrap]*c_r ;
              r[0] -= gamma[nextrap-1]*old_c_r[0] ;
            }else{
              r.emplace_back(hc_r) ;
-             r[0] -= temp*c_r ;
-          }
-             printf("print current c_r: %.10f \n",scalar(c_r*c_r));
+             r[0] -= alpha[nextrap]*c_r ;
+           }
+
              if (nextrap > 0) printf(" old c_r: %.10f \n",scalar(old_c_r[0]*old_c_r[0]));
-             printf("print <hc_r|hc_r>: %.10f \n",scalar(hc_r*hc_r));
 
             /* calculate s = hc_l - beta(i-1)pT(i-1) - alpha(i)pT(i)
              */
 
             if (nextrap > 0) {
              s.emplace_back(hc_l) ;
-             s[0] -= temp*c_l ;
+             s[0] -= alpha[nextrap]*c_l ;
              s[0] -= beta[nextrap-1]*old_c_l[0] ;
            }else{
              s.emplace_back(hc_l) ;
-             s[0] -= temp*c_l ;
+             s[0] -= alpha[nextrap]*c_l ;
           }
-
              printf("print <s|s>: %.10f \n",scalar(s[0]*s[0]));
 
-             temp = scalar(conj(s[0])*r[0]) ; 
+             temp = scalar(r[0]*s[0]) ; 
 
-             beta.push_back (sqrt(aquarius::abs(temp))) ;
-             gamma.push_back (temp/beta[nextrap])  ; 
+             beta.emplace_back (sqrt(aquarius::abs(scalar(s[0]*r[0])))) ;
+             gamma.emplace_back (temp/beta[nextrap])  ; 
 
              printf("print beta: %.10f \n",beta[nextrap]);
              printf("print gamma: %.10f \n",gamma[nextrap]);
@@ -204,10 +198,11 @@ class Lanczos : public task::Destructible
              c_l = s[0]/gamma[nextrap-1] ; 
              c_r = r[0]/beta[nextrap-1] ; 
 
-            printf("scalar product c_l: %.10f \n",scalar(c_l*c_l));
-            printf("scalar product c_r: %.10f \n",scalar(c_r*c_r));
+            printf("test orthogonality: %.10f \n",scalar(c_r*old_c_l[0]));
+            printf("test orthogonality: %.10f \n",scalar(c_l*old_c_r[0]));
+            printf("test normalization: %.10f \n",scalar(c_r*c_l));
+//          printf("scalar product c_r: %.10f \n",scalar(c_r*c_r));
 
-            printf("print nextrap: %10d \n",nextrap);
             printf("print alpha: %.10f \n",alpha[nextrap-1]);
             printf("print beta: %.10f \n",beta[nextrap-1]);
             printf("print gamma: %.10f \n",gamma[nextrap-1]);
@@ -220,7 +215,6 @@ class Lanczos : public task::Destructible
                 c_r = old_c_r[nextrap-1];
                 c_l = old_c_l[nextrap-1];
             }
-            else
             {
                 getRoot(c_r, c_l);
             }
