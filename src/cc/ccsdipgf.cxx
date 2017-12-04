@@ -253,10 +253,16 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
             /*
              * Convert H*r to (H-w)*r
              */
-            Zr -= omega.real()*Rr;
-            Zr += omega.imag()*Ri;
-            Zi -= omega.real()*Ri;
-            Zi -= omega.imag()*Rr;
+          Zr -= omega.real()*Rr;
+          Zr += omega.imag()*Ri;
+          Zi -= omega.real()*Ri;
+          Zi -= omega.imag()*Rr;
+
+ //           Zr += omega.real()*Rr;
+ //           Zr -= omega.imag()*Ri;
+ //           Zi += omega.real()*Ri;
+ //           Zi += omega.imag()*Rr;
+
             //Zr *= -1;
             //Zi *= -1;
 
@@ -273,6 +279,16 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
                                 0.5*scalar(e(2)["mne"]*Zr(2)["emn"]),
                                     scalar(e(1)[  "m"]*Zi(1)[  "m"]) +
                                 0.5*scalar(e(2)["mne"]*Zi(2)["emn"]));
+
+             U value;
+
+             value = scalar(e(1)[  "m"]*Zr(1)[  "m"]) + 0.5*scalar(e(2)["mne"]*Zr(2)["emn"]) ;
+
+             std::ofstream gomega;
+             gomega.open ("gomega.dat", ofstream::out|std::ios::app);
+               gomega << omega.real() << " " << value << std::endl ; 
+             gomega.close();
+
         }
 };
 

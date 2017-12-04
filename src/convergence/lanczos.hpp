@@ -68,7 +68,6 @@ class Lanczos : public task::Destructible
             old_c_r.emplace_back(c_r);
             old_c_l.emplace_back(c_l);
 
-            printf("scalar product rhs: %.10f \n",scalar(old_c_r[0]*old_c_r[0]));
         }
 
         void getRoot(T& c_r, T& c_i, T& hc_r, T& hc_i)
@@ -187,7 +186,7 @@ class Lanczos : public task::Destructible
 
              temp = scalar(r[0]*s[0]) ; 
 
-             beta.emplace_back (sqrt(aquarius::abs(scalar(s[0]*r[0])))) ;
+             beta.emplace_back (sqrt(aquarius::abs(scalar(r[0]*s[0])))) ;
              gamma.emplace_back (temp/beta[nextrap])  ; 
 
              printf("print beta: %.10f \n",beta[nextrap]);
@@ -201,7 +200,6 @@ class Lanczos : public task::Destructible
             printf("test orthogonality: %.10f \n",scalar(c_r*old_c_l[0]));
             printf("test orthogonality: %.10f \n",scalar(c_l*old_c_r[0]));
             printf("test normalization: %.10f \n",scalar(c_r*c_l));
-//          printf("scalar product c_r: %.10f \n",scalar(c_r*c_r));
 
             printf("print alpha: %.10f \n",alpha[nextrap-1]);
             printf("print beta: %.10f \n",beta[nextrap-1]);
