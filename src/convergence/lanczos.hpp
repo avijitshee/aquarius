@@ -84,34 +84,6 @@ class Lanczos : public task::Destructible
 
         }
 
-        void getRoot(T& c_r, T& c_i, T& hc_r, T& hc_i)
-        {
-            getRoot(c_r, c_i);
-
-            hc_r = 0;
-            hc_i = 0;
-            for (int extrap = 0;extrap < nextrap;extrap++)
-            {
-                hc_r += old_hc_r[extrap]*v[extrap].real();
-                hc_r -= old_hc_l[extrap]*v[extrap].imag();
-                hc_i += old_hc_r[extrap]*v[extrap].imag();
-                hc_i += old_hc_l[extrap]*v[extrap].real();
-            }
-        }
-
-        void getRoot(T& c_r, T& c_i)
-        {
-            c_r = 0;
-            c_i = 0;
-            for (int extrap = 0;extrap < nextrap;extrap++)
-            {
-                c_r += old_c_r[extrap]*v[extrap].real();
-                c_r -= old_c_l[extrap]*v[extrap].imag();
-                c_i += old_c_r[extrap]*v[extrap].imag();
-                c_i += old_c_l[extrap]*v[extrap].real();
-            }
-        }
-
     public:
         Lanczos(const input::Config& config, const int nvec)
         {
@@ -312,19 +284,6 @@ class Lanczos : public task::Destructible
             printf("print alpha: %.10f \n",alpha[nextrap-1]);
             printf("print beta: %.10f \n",beta[nextrap-1]);
             printf("print gamma: %.10f \n",gamma[nextrap-1]);
-        }
-
-
-        void getSolution(T& c_r, T& c_l)
-        {
-            if (continuous)
-            {
-                c_r = old_c_r[nextrap-1];
-                c_l = old_c_l[nextrap-1];
-            }
-            {
-                getRoot(c_r, c_l);
-            }
         }
 
         void reset(int nvec = 1)
