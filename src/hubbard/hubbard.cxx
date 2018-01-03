@@ -1,4 +1,4 @@
-#include "jellium.hpp"
+#include "hubbard.hpp"
 
 using namespace aquarius::input;
 using namespace aquarius::task;
@@ -8,7 +8,7 @@ using namespace aquarius::symmetry;
 
 namespace aquarius
 {
-namespace jellium
+namespace hubbard
 {
 
 template <typename U>
@@ -16,17 +16,17 @@ hubbard<U>::hubbard(const string& name, Config& config)
 : Task(name, config),
   nelec(config.get<int>("num_electrons")),
   norb(config.get<int>("num_orbitals")),
-  radius(config.get<double>("radius"))
+  radius(config.get<double>("radius")),
+  multiplicity(config.get<int>("multiplicity"))
 {
     vector<Requirement> reqs;
     addProduct("double", "energy", reqs);
     addProduct("Ea", "Ea", reqs);
     addProduct("Eb", "Eb", reqs);
-    addProduct("Fa", "Fa", reqs);
-    addProduct("Fb", "Fb", reqs);
     addProduct("Da", "Da", reqs);
     addProduct("Db", "Db", reqs);
-    addProduct("moints", "H", reqs);
+    addProduct("hubbard_1eints", "Fa", reqs);
+    addProduct("hubbard_2eints", "HH2b", reqs);
 
     int d = config.get<int>("dimension");
     assert(d == 3);
@@ -145,6 +145,7 @@ bool hubbard<U>::run(TaskDAG& dag, const Arena& arena)
         Da.writeRemoteData({0,0});
         Fa.writeRemoteData({0,0});
     }
+
     Db = Da;
     Fb = Fa;
 
@@ -160,10 +161,10 @@ bool hubbard<U>::run(TaskDAG& dag, const Arena& arena)
 
     int k ; 
 
-    for (int i = 0;i < nocc;i++)
+    for (int i = 0;i < nocc;i++)  // probably this is correct. nocc should not be replaced by norb 
     {
         k = i*nocc+i ;
-        ijiklpairs.emplace_back(k*nocc*nocc+k, E[0][i]);
+        ijklpairs.emplace_back(k*nocc*nocc+k, v_onsite[i]);
     }
 
     for (int i = 0;i < nocc;i++)
@@ -320,8 +321,10 @@ radius double,
 num_electrons int,
 num_orbitals int,
 dimension? int 3
+multiplicity?
+    int 1,
 
 )!";
 
-INSTANTIATE_SPECIALIZATIONS(aquarius::jellium::hubbard);
-REGISTER_TASK(aquarius::jellium::hubbard<double>,"jellium",spec);
+INSTANTIATE_SPECIALIZATIONS(aquarius::hubbard::hubbard);
+REGISTER_TASK(aquarius::hubbard::hubbard<double>,"hubbard",spec);
