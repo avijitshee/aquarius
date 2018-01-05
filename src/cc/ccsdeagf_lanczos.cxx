@@ -258,8 +258,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
              }
 
-             std::ifstream iffile("gomega.dat");
-             if (iffile) remove("gomega.dat");
+            std::ifstream iffile("gomega.dat");
+            if (iffile) remove("gomega.dat");
 
             U pi = 2*acos(0.0);
 
@@ -282,7 +282,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               CU com_one(1.,0.) ;
               omega = {o.real(),o.imag()} ;
 
-             this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
+              this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
 
              for(int i=(nvec_lanczos-1);i >= 0;i--){  
               alpha_temp = {alpha[i],0.} ;

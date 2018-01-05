@@ -29,6 +29,7 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
         int orbital;
         vector<CU> omegas;
         CU omega;
+        U value ;
 
     public:
         CCSDIPGF(const string& name, Config& config)
@@ -170,10 +171,13 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
 
             auto& D = this->puttmp("D", new ComplexDenominator<U>(H));
 
+             std::ifstream iffile("gomega.dat");
+             if (iffile) remove("gomega.dat");
+
             for (auto& o : omegas)
             {
                 this->puttmp("krylov", new ComplexLinearKrylov<ExcitationOperator<U,1,2>>(krylov_config, b));
-                omega.real(-o.real());
+                omega.real( -o.real());
                 omega.imag( o.imag());
 
                 this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl;
@@ -187,6 +191,12 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
                 Ri /= norm;
 
                 Iterative<CU>::run(dag, arena);
+
+                std::ofstream gomega;
+                gomega.open ("gomega.dat", ofstream::out|std::ios::app);
+                 gomega << -omega.real() << " " << value << std::endl ; 
+                gomega.close();
+
             }
 
             return true;
@@ -253,18 +263,18 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
             /*
              * Convert H*r to (H-w)*r
              */
-          Zr -= omega.real()*Rr;
-          Zr += omega.imag()*Ri;
-          Zi -= omega.real()*Ri;
-          Zi -= omega.imag()*Rr;
+              Zr += omega.real()*Rr;
+              Zr += omega.imag()*Ri;
+              Zi += omega.real()*Ri;
+              Zi -= omega.imag()*Rr;
 
- //           Zr += omega.real()*Rr;
- //           Zr -= omega.imag()*Ri;
- //           Zi += omega.real()*Ri;
- //           Zi += omega.imag()*Rr;
+//           Zr += omega.real()*Rr;
+//           Zr -= omega.imag()*Ri;
+//           Zi += omega.real()*Ri;
+//           Zi += omega.imag()*Rr;
 
-            //Zr *= -1;
-            //Zi *= -1;
+//            Zr *= -1;
+//            Zi *= -1;
 
             //printf("<Ur|Ur>: %.15f\n", scalar(Zr*Zr));
             //printf("<Ui|Ui>: %.15f\n", scalar(Zi*Zi));
@@ -280,14 +290,9 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
                                     scalar(e(1)[  "m"]*Zi(1)[  "m"]) +
                                 0.5*scalar(e(2)["mne"]*Zi(2)["emn"]));
 
-             U value;
-
-             value = scalar(e(1)[  "m"]*Zr(1)[  "m"]) + 0.5*scalar(e(2)["mne"]*Zr(2)["emn"]) ;
-
-             std::ofstream gomega;
-             gomega.open ("gomega.dat", ofstream::out|std::ios::app);
-               gomega << omega.real() << " " << value << std::endl ; 
-             gomega.close();
+ 
+        //      value = scalar(e(1)[  "m"]*Zr(1)[  "m"]) + 0.5*scalar(e(2)["mne"]*Zr(2)["emn"]) ;
+              value = scalar(e(1)[  "m"]*Zi(1)[  "m"]) + 0.5*scalar(e(2)["mne"]*Zi(2)["emn"]) ;
 
         }
 };
