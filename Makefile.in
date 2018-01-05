@@ -159,6 +159,8 @@ am____top_builddir__bin_aquarius_SOURCES_DIST = src/autocc/autocc.cxx \
 	src/integrals/nai.cxx src/integrals/os.cxx \
 	src/integrals/ovi.cxx src/integrals/shell.cxx \
 	src/jellium/jellium.cxx src/main/main.cxx \
+	src/hubbard/hubbard.cxx  \
+	src/hubbard/uhf_modelH.cxx  \
 	src/operator/2eoperator.cxx src/operator/aomoints.cxx \
 	src/operator/fakemoints.cxx src/operator/rhfaomoints.cxx \
 	src/operator/moints.cxx src/operator/sparseaomoints.cxx \
@@ -224,6 +226,8 @@ am___top_builddir__bin_aquarius_OBJECTS = src/autocc/autocc.$(OBJEXT) \
 	src/integrals/nai.$(OBJEXT) src/integrals/os.$(OBJEXT) \
 	src/integrals/ovi.$(OBJEXT) src/integrals/shell.$(OBJEXT) \
 	src/jellium/jellium.$(OBJEXT) src/main/main.$(OBJEXT) \
+	src/hubbard/hubbard.$(OBJEXT) \
+	src/hubbard/uhf_modelH.$(OBJEXT) \
 	src/operator/2eoperator.$(OBJEXT) \
 	src/operator/aomoints.$(OBJEXT) \
 	src/operator/fakemoints.$(OBJEXT) \
@@ -479,6 +483,7 @@ __top_builddir__bin_aquarius_SOURCES = src/autocc/autocc.cxx \
 	src/integrals/nai.cxx src/integrals/os.cxx \
 	src/integrals/ovi.cxx src/integrals/shell.cxx \
 	src/jellium/jellium.cxx src/main/main.cxx \
+	src/hubbard/hubbard.cxx src/hubbard/uhf_modelH.cxx \
 	src/operator/2eoperator.cxx src/operator/aomoints.cxx \
 	src/operator/fakemoints.cxx src/operator/rhfaomoints.cxx \
 	src/operator/moints.cxx src/operator/sparseaomoints.cxx \
@@ -792,6 +797,16 @@ src/jellium/$(DEPDIR)/$(am__dirstamp):
 	@: > src/jellium/$(DEPDIR)/$(am__dirstamp)
 src/jellium/jellium.$(OBJEXT): src/jellium/$(am__dirstamp) \
 	src/jellium/$(DEPDIR)/$(am__dirstamp)
+src/hubbard/$(am__dirstamp):
+	@$(MKDIR_P) src/hubbard
+	@: > src/hubbard/$(am__dirstamp)
+src/hubbard/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) src/hubbard/$(DEPDIR)
+	@: > src/hubbard/$(DEPDIR)/$(am__dirstamp)
+src/hubbard/hubbard.$(OBJEXT): src/hubbard/$(am__dirstamp) \
+	src/hubbard/$(DEPDIR)/$(am__dirstamp)
+src/hubbard/uhf_modelH.$(OBJEXT): src/hubbard/$(am__dirstamp) \
+	src/hubbard/$(DEPDIR)/$(am__dirstamp)
 src/main/$(am__dirstamp):
 	@$(MKDIR_P) src/main
 	@: > src/main/$(am__dirstamp)
@@ -904,6 +919,7 @@ mostlyclean-compile:
 	-rm -f src/input/*.$(OBJEXT)
 	-rm -f src/integrals/*.$(OBJEXT)
 	-rm -f src/jellium/*.$(OBJEXT)
+	-rm -f src/hubbard/*.$(OBJEXT)
 	-rm -f src/main/*.$(OBJEXT)
 	-rm -f src/operator/*.$(OBJEXT)
 	-rm -f src/scf/*.$(OBJEXT)
@@ -1004,6 +1020,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@src/integrals/$(DEPDIR)/ovi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/integrals/$(DEPDIR)/shell.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/jellium/$(DEPDIR)/jellium.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src/hubbard/$(DEPDIR)/hubbard.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/main/$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/operator/$(DEPDIR)/2eoperator.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/operator/$(DEPDIR)/aomoints.Po@am__quote@
@@ -1307,6 +1324,8 @@ distclean-generic:
 	-rm -f src/integrals/$(am__dirstamp)
 	-rm -f src/jellium/$(DEPDIR)/$(am__dirstamp)
 	-rm -f src/jellium/$(am__dirstamp)
+	-rm -f src/hubbard/$(DEPDIR)/$(am__dirstamp)
+	-rm -f src/hubbard/$(am__dirstamp)
 	-rm -f src/main/$(DEPDIR)/$(am__dirstamp)
 	-rm -f src/main/$(am__dirstamp)
 	-rm -f src/operator/$(DEPDIR)/$(am__dirstamp)
@@ -1334,7 +1353,7 @@ clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf src/autocc/$(DEPDIR) src/cc/$(DEPDIR) src/input/$(DEPDIR) src/integrals/$(DEPDIR) src/jellium/$(DEPDIR) src/main/$(DEPDIR) src/operator/$(DEPDIR) src/scf/$(DEPDIR) src/symmetry/$(DEPDIR) src/task/$(DEPDIR) src/tensor/$(DEPDIR) src/time/$(DEPDIR) src/util/$(DEPDIR)
+	-rm -rf src/autocc/$(DEPDIR) src/cc/$(DEPDIR) src/input/$(DEPDIR) src/integrals/$(DEPDIR) src/jellium/$(DEPDIR) src/hubbard/$(DEPDIR) src/main/$(DEPDIR) src/operator/$(DEPDIR) src/scf/$(DEPDIR) src/symmetry/$(DEPDIR) src/task/$(DEPDIR) src/tensor/$(DEPDIR) src/time/$(DEPDIR) src/util/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-hdr distclean-tags
@@ -1382,7 +1401,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf src/autocc/$(DEPDIR) src/cc/$(DEPDIR) src/input/$(DEPDIR) src/integrals/$(DEPDIR) src/jellium/$(DEPDIR) src/main/$(DEPDIR) src/operator/$(DEPDIR) src/scf/$(DEPDIR) src/symmetry/$(DEPDIR) src/task/$(DEPDIR) src/tensor/$(DEPDIR) src/time/$(DEPDIR) src/util/$(DEPDIR)
+	-rm -rf src/autocc/$(DEPDIR) src/cc/$(DEPDIR) src/input/$(DEPDIR) src/integrals/$(DEPDIR) src/jellium/$(DEPDIR) src/hubbard/$(DEPDIR) src/main/$(DEPDIR) src/operator/$(DEPDIR) src/scf/$(DEPDIR) src/symmetry/$(DEPDIR) src/task/$(DEPDIR) src/tensor/$(DEPDIR) src/time/$(DEPDIR) src/util/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

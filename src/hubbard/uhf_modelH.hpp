@@ -1,9 +1,10 @@
-#ifndef _AQUARIUS_SCF_UHF_COMMON_HPP_
-#define _AQUARIUS_SCF_UHF_COMMON_HPP_
+#ifndef _AQUARIUS_SCF_UHF_MODELH_COMMON_HPP_
+#define _AQUARIUS_SCF_UHF_MODELH_COMMON_HPP_
 
 #include "util/global.hpp"
 
 #include "tensor/symblocked_tensor.hpp"
+#include "operator/2eoperator.hpp"
 #include "integrals/1eints.hpp"
 #include "input/molecule.hpp"
 #include "input/config.hpp"
@@ -14,11 +15,11 @@
 
 namespace aquarius
 {
-namespace scf
+namespace hubbard
 {
 
 template <typename T>
-class UHF : public Iterative<T>
+class uhf_modelh : public Iterative<T>
 {
     protected:
         bool frozen_core;
@@ -28,7 +29,7 @@ class UHF : public Iterative<T>
         convergence::DIIS<tensor::SymmetryBlockedTensor<T>> diis;
 
     public:
-        UHF(const string& name, input::Config& config);
+        uhf_modelh(const string& name, input::Config& config);
 
         void iterate(const Arena& arena);
 

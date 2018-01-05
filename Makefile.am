@@ -89,6 +89,7 @@ __top_builddir__bin_aquarius_SOURCES = \
 	src/integrals/shell.cxx \
 	\
 	src/jellium/jellium.cxx \
+	src/hubbard/hubbard.cxx \
 	\
 	src/main/main.cxx \
 	\
