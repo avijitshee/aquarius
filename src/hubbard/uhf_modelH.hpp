@@ -1,5 +1,5 @@
-#ifndef _AQUARIUS_SCF_UHF_MODELH_COMMON_HPP_
-#define _AQUARIUS_SCF_UHF_MODELH_COMMON_HPP_
+#ifndef _AQUARIUS_HUBBARD_UHF_MODELH_COMMON_HPP_
+#define _AQUARIUS_HUBBARD_UHF_MODELH_COMMON_HPP_
 
 #include "util/global.hpp"
 
@@ -25,7 +25,8 @@ class uhf_modelh : public Iterative<T>
         bool frozen_core;
         T damping;
         vector<int> occ_alpha, occ_beta;
-        vector<vector<real_type_t<T>>> E_alpha, E_beta;
+        vector<vector<T>> E_alpha, E_beta;
+//        vector<real_type_t<T>> E_alpha, E_beta;
         convergence::DIIS<tensor::SymmetryBlockedTensor<T>> diis;
 
     public:
@@ -36,19 +37,24 @@ class uhf_modelh : public Iterative<T>
         bool run(task::TaskDAG& dag, const Arena& arena);
 
     protected:
-        virtual void calcSMinusHalf() = 0;
+//        virtual void calcSMinusHalf() = 0;
+        void calcSMinusHalf() ;
 
         void calcS2();
 
-        virtual void diagonalizeFock() = 0;
+//        virtual void diagonalizeFock() = 0;
+        void diagonalizeFock() ;
 
-        virtual void buildFock() = 0;
+//        virtual void buildFock() = 0;
+        void buildFock() ;
 
         void calcEnergy();
 
         void calcDensity();
 
-        void DIISExtrap();
+        void DIISExtrap() ;
+       
+
 };
 
 }

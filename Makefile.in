@@ -158,9 +158,9 @@ am____top_builddir__bin_aquarius_SOURCES_DIST = src/autocc/autocc.cxx \
 	src/integrals/fmgamma.cxx src/integrals/kei.cxx \
 	src/integrals/nai.cxx src/integrals/os.cxx \
 	src/integrals/ovi.cxx src/integrals/shell.cxx \
-	src/jellium/jellium.cxx src/main/main.cxx \
-	src/hubbard/hubbard.cxx  \
+	src/jellium/jellium.cxx src/hubbard/hubbard.cxx  \
 	src/hubbard/uhf_modelH.cxx  \
+        src/main/main.cxx \
 	src/operator/2eoperator.cxx src/operator/aomoints.cxx \
 	src/operator/fakemoints.cxx src/operator/rhfaomoints.cxx \
 	src/operator/moints.cxx src/operator/sparseaomoints.cxx \
@@ -1021,6 +1021,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@src/integrals/$(DEPDIR)/shell.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/jellium/$(DEPDIR)/jellium.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/hubbard/$(DEPDIR)/hubbard.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src/hubbard/$(DEPDIR)/uhf_modelH.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/main/$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/operator/$(DEPDIR)/2eoperator.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/operator/$(DEPDIR)/aomoints.Po@am__quote@

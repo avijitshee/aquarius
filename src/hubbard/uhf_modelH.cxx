@@ -1,5 +1,6 @@
 #include "uhf_modelH.hpp"
 #include "hubbard.hpp"
+#include "util/global.hpp"
 
 using namespace aquarius::input;
 using namespace aquarius::tensor;
@@ -19,9 +20,11 @@ uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
   diis(config.get("diis"), 2)
 {
     vector<Requirement> reqs;
-    reqs += Requirement("molecule", "molecule");
-    reqs += Requirement("ovi", "S");
+//    reqs += Requirement("molecule", "molecule");
+    reqs += Requirement("hubbard_S", "S");
     reqs += Requirement("hubbard_1eints", "H");
+    reqs += Requirement("Da", "Da");
+    reqs += Requirement("Db", "Db");
     this->addProduct(Product("double", "energy", reqs));
     this->addProduct(Product("double", "convergence", reqs));
     this->addProduct(Product("double", "S2", reqs));
@@ -32,8 +35,8 @@ uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
     this->addProduct(Product("Eb", "Eb", reqs));
     this->addProduct(Product("Fa", "Fa", reqs));
     this->addProduct(Product("Fb", "Fb", reqs));
-    this->addProduct(Product("Da", "Da", reqs));
-    this->addProduct(Product("Db", "Db", reqs));
+//    this->addProduct(Product("Da", "Da", reqs));
+//    this->addProduct(Product("Db", "Db", reqs));
 }
 
 template <typename T>
@@ -41,18 +44,18 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 {
 //    int nalpha = molecule.getNumAlphaElectrons();
 //    int nbeta = molecule.getNumBetaElectrons();
-    int nirreps = 0 ;
+    int nirreps = 1 ;
     int norb = 12 ;
-    int nalpha = norb;
-    int nbeta = norb;
+    int nalpha = norb/2;
+    int nbeta = norb/2;
         
     vector<int> shapeNN = {NS,NS};
     vector<vector<int>> sizenn  = {{norb},{norb}};
 
     this->put("Fa", new SymmetryBlockedTensor<T>("Fa", arena, symmetry::PointGroup::C1(), 2, sizenn, shapeNN, false));
     this->put("Fb", new SymmetryBlockedTensor<T>("Fb", arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
-    this->put("Da", new SymmetryBlockedTensor<T>("Da", arena, PointGroup::C1(), 2, sizenn, shapeNN, true));
-    this->put("Db", new SymmetryBlockedTensor<T>("Db", arena, PointGroup::C1(), 2, sizenn, shapeNN, true));
+//    this->put("Da", new SymmetryBlockedTensor<T>("Da", arena, PointGroup::C1(), 2, sizenn, shapeNN, true));
+//    this->put("Db", new SymmetryBlockedTensor<T>("Db", arena, PointGroup::C1(), 2, sizenn, shapeNN, true));
 
     this->puttmp("dF",     new SymmetryBlockedTensor<T>("dF",     arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
     this->puttmp("Ca",     new SymmetryBlockedTensor<T>("Ca",     arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
@@ -77,7 +80,9 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 
     CTF_Timer_epoch ep(this->name.c_str());
     ep.begin();
+
     Iterative<T>::run(dag, arena);
+
     ep.end();
 
     if (this->isUsed("S2") || this->isUsed("multiplicity"))
@@ -144,13 +149,12 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
                                                              {zero,nfrozen_beta},
                                                              {{norb},occ_beta})));
 
-       this->put("vrt", new MOSpace<T>(SymmetryBlockedTensor<T>("CA", this->template gettmp<SymmetryBlockedTensor<T>>("Ca"),
+    this->put("vrt", new MOSpace<T>(SymmetryBlockedTensor<T>("CA", this->template gettmp<SymmetryBlockedTensor<T>>("Ca"),
                                                              {zero,vrt0_alpha},
                                                              {{norb},vrt_alpha}),
                                        SymmetryBlockedTensor<T>("Ca", this->template gettmp<SymmetryBlockedTensor<T>>("Cb"),
                                                              {zero,vrt0_beta},
                                                              {{norb},vrt_beta})));
-
     vector<int> shapeN{NS};
     vector<vector<int>> sizena{{norb}};
     vector<vector<int>> sizenb{{norb}};
@@ -178,15 +182,17 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 template <typename T>
 void uhf_modelh<T>::iterate(const Arena& arena)
 {
-    const Molecule& molecule = this->template get<Molecule>("molecule");
+//  const Molecule& molecule = this->template get<Molecule>("molecule");
 
-    int nalpha = molecule.getNumAlphaElectrons();
-    int nbeta = molecule.getNumBetaElectrons();
+//  int nalpha = molecule.getNumAlphaElectrons();
+//  int nbeta = molecule.getNumBetaElectrons();
 
     int nirreps ;
     int norb ;
-    nirreps = 0 ;
+    nirreps = 1 ;
     norb = 12 ;
+    int nalpha = norb/2;
+    int nbeta = norb/2;
 
     buildFock();
     DIISExtrap();
@@ -243,14 +249,175 @@ void uhf_modelh<T>::iterate(const Arena& arena)
 }
 
 template <typename T>
+void uhf_modelh<T>::calcSMinusHalf()
+{
+//  auto Hubbard& hubbard = this->template get<Hubbard>("hubbard");
+//  const norb = hubbard.getNumOrbitals();
+//  int nirreps = hubbard.getNumIrreps();
+
+    int norb = 12;
+    int nirreps = 1;
+
+    auto& S = this->template get<SymmetryBlockedTensor<T>>("S");
+    auto& Smhalf = this->template gettmp<SymmetryBlockedTensor<T>>("S^-1/2");
+
+    for (int i = 0;i < nirreps;i++)
+    {
+        //cout << "S " << (i+1) << endl;
+        //vector<T> vals;
+        //S({i,i}).getAllData(vals);
+        //printmatrix(norb[i], norb[i], vals.data(), 6, 3, 108);
+    }
+
+    for (int i = 0;i < nirreps;i++)
+    {
+        if (norb == 0) continue;
+
+        vector<int> irreps(2,i);
+        vector<real_type_t<T>> E(norb);
+
+        if (S.arena.rank == 0)
+        {
+            vector<T> s;
+            vector<T> smhalf(norb*norb);
+
+            S.getAllData(irreps, s, 0);
+            assert(s.size() == norb*norb);
+
+            //PROFILE_FLOPS(26*norb[i]*norb[i]*norb[i]);
+            int info = heev('V', 'U', norb, s.data(), norb, E.data());
+            assert(info == 0);
+
+            fill(smhalf.begin(), smhalf.end(), (T)0);
+            //PROFILE_FLOPS(2*norb[i]*norb[i]*norb[i]);
+            for (int j = 0;j < norb;j++)
+            {
+                ger(norb, norb, 1/sqrt(E[j]), &s[j*norb], 1, &s[j*norb], 1, smhalf.data(), norb);
+            }
+
+            vector<tkv_pair<T>> pairs(norb*norb);
+
+            for (int j = 0;j < norb*norb;j++)
+            {
+                pairs[j].k = j;
+                pairs[j].d = smhalf[j];
+            }
+
+            Smhalf.writeRemoteData(irreps, pairs);
+        }
+        else
+        {
+            S.getAllData(irreps, 0);
+            Smhalf.writeRemoteData(irreps);
+        }
+    }
+}
+
+template <typename T>
+void uhf_modelh<T>::diagonalizeFock()
+{
+//  const Molecule& molecule = this->template get<Molecule>("molecule");
+//  const vector<int>& norb = molecule.getNumOrbitals();
+
+    int norb = 12 ;
+    int nirreps = 1 ;
+
+    auto& S  = this->template get   <SymmetryBlockedTensor<T>>("S");
+    auto& Fa = this->template get   <SymmetryBlockedTensor<T>>("Fa");
+    auto& Fb = this->template get   <SymmetryBlockedTensor<T>>("Fb");
+    auto& Ca = this->template gettmp<SymmetryBlockedTensor<T>>("Ca");
+    auto& Cb = this->template gettmp<SymmetryBlockedTensor<T>>("Cb");
+
+    for (int i = 0;i < nirreps;i++)
+    {
+        //cout << "F " << (i+1) << endl;
+        //vector<T> vals;
+        //Fa({i,i}).getAllData(vals);
+        //printmatrix(norb[i], norb[i], vals.data(), 6, 3, 108);
+    }
+
+    for (int i = 0;i < nirreps;i++)
+    {
+        if (norb == 0) continue;
+
+        vector<int> irreps(2,i);
+
+        if (S.arena.rank == 0)
+        {
+            vector<T> s;
+            S.getAllData(irreps, s, 0);
+            assert(s.size() == norb*norb);
+
+            for (int spin : {0,1})
+            {
+                auto& F = (spin == 0 ? Fa : Fb);
+                auto& C = (spin == 0 ? Ca : Cb);
+                auto& E = (spin == 0 ? E_alpha[i] : E_beta[i]);
+
+                int info;
+                vector<T> fock, ctsc(norb*norb);
+                vector<tkv_pair<T>> pairs(norb*norb);
+                vector<T> tmp(s);
+
+                F.getAllData(irreps, fock, 0);
+                assert(fock.size() == norb*norb);
+                //PROFILE_FLOPS(9*norb[i]*norb[i]*norb[i]);
+
+                info = hegv(AXBX, 'V', 'U', norb, fock.data(), norb, tmp.data(), norb, E.data());
+
+                if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
+
+                assert(info == 0);
+
+                S.arena.comm().Bcast(E);
+                
+                for (int j = 0;j < norb;j++)
+                {
+                    T sign = 0;
+                    for (int k = 0;k < norb;k++)
+                    {
+                        if (aquarius::abs(fock[k+j*norb]) > 1e-10)
+                        {
+                            sign = (fock[k+j*norb] < 0 ? -1 : 1);
+                            break;
+                        }
+                    }
+                    //PROFILE_FLOPS(norb[i]);
+                    scal(norb, sign, &fock[j*norb], 1);
+                }
+
+                for (int j = 0;j < norb*norb;j++)
+                {
+                    pairs[j].k = j;
+                    pairs[j].d = fock[j];
+                }
+
+                C.writeRemoteData(irreps, pairs);
+            }
+        }
+        else
+        {
+            S.getAllData(irreps, 0);
+            Fa.getAllData(irreps, 0);
+            S.arena.comm().Bcast(E_alpha[i], 0);
+            Ca.writeRemoteData(irreps);
+            Fb.getAllData(irreps, 0);
+            S.arena.comm().Bcast(E_beta[i], 0);
+            Cb.writeRemoteData(irreps);
+        }
+    }
+}
+
+template <typename T>
 void uhf_modelh<T>::calcS2()
 {
-    const auto& molecule = this->template get<Molecule>("molecule");
-    const PointGroup& group = molecule.getGroup();
-    int nalpha = molecule.getNumAlphaElectrons();
-    int nbeta = molecule.getNumBetaElectrons();
-    int nirreps ;
-    int norb ;
+//  const auto& molecule = this->template get<Molecule>("molecule");
+//  int nalpha = molecule.getNumAlphaElectrons();
+//  int nbeta = molecule.getNumBetaElectrons();
+    int nirreps = 1 ;
+    int norb = 12 ;
+    int nalpha = norb/2;
+    int nbeta  = norb/2;
 
     auto& S = this->template get<SymmetryBlockedTensor<T>>("S"); // this must be set to a unit matrix
 
@@ -280,7 +447,7 @@ void uhf_modelh<T>::calcS2()
 template <typename T>
 void uhf_modelh<T>::calcEnergy()
 {
-    const Molecule& molecule = this->template get<Molecule>("molecule");
+//    const Molecule& molecule = this->template get<Molecule>("molecule");
 
     auto& H  = this->template get<SymmetryBlockedTensor<T>>("H");
     auto& Fa = this->template get<SymmetryBlockedTensor<T>>("Fa");
@@ -295,8 +462,8 @@ void uhf_modelh<T>::calcEnergy()
      */
     Fa["ab"] += H["ab"];
     Fb["ab"] += H["ab"];
-    this->energy()  = molecule.getNuclearRepulsion();
-    this->energy() += 0.5*scalar(Da["ab"]*Fa["ab"]);
+//    this->energy()  = molecule.getNuclearRepulsion();
+    this->energy()  = 0.5*scalar(Da["ab"]*Fa["ab"]);
     this->energy() += 0.5*scalar(Db["ab"]*Fb["ab"]);
     Fa["ab"] -= H["ab"];
     Fb["ab"] -= H["ab"];
@@ -305,13 +472,15 @@ void uhf_modelh<T>::calcEnergy()
 template <typename T>
 void uhf_modelh<T>::calcDensity()
 {
-    const Molecule& molecule = this->template get<Molecule>("molecule");
+//    const Molecule& molecule = this->template get<Molecule>("molecule");
 
 //    const vector<int>& norb = molecule.getNumOrbitals();
-    int nalpha = molecule.getNumAlphaElectrons();
-    int nbeta = molecule.getNumBetaElectrons();
-    int nirreps ;
-    int norb ;
+//  int nalpha = molecule.getNumAlphaElectrons();
+//  int nbeta = molecule.getNumBetaElectrons();
+    int nirreps =1 ;
+    int norb =12 ;
+    int nalpha = norb/2;
+    int nbeta = norb/2;
 
     auto& dDa = this->template gettmp<SymmetryBlockedTensor<T>>("dDa");
     auto& dDb = this->template gettmp<SymmetryBlockedTensor<T>>("dDb");
@@ -323,7 +492,6 @@ void uhf_modelh<T>::calcDensity()
                                     {zero,zero}, {{norb},occ_alpha});
     SymmetryBlockedTensor<T> Cb_occ("Ci", this->template gettmp<SymmetryBlockedTensor<T>>("Cb"),
                                     {zero,zero}, {{norb},occ_beta});
-
     /*
      * D[ab] = C[ai]*C[bi]
      */
@@ -338,7 +506,7 @@ void uhf_modelh<T>::calcDensity()
 template <typename T>
 void uhf_modelh<T>::buildFock()
 {
-    int norb ;
+    int norb = 12 ;
     int nirrep = 1;
 
     for (int i = 1;i < nirrep;i++) ;
@@ -354,8 +522,7 @@ void uhf_modelh<T>::buildFock()
     vector<vector<T>> focka(nirrep), fockb(nirrep);
     vector<vector<T>> densa(nirrep), densb(nirrep);
     vector<vector<T>> densab(nirrep);
-    vector<T> v_onsite = {4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0} ;
-
+    vector<T> v_onsite = {4.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0} ;
 
     for (int i = 0;i < nirrep;i++)
     {
@@ -383,12 +550,16 @@ void uhf_modelh<T>::buildFock()
         //PROFILE_FLOPS(norb[i]*norb[i]);
         axpy(norb*norb, 1.0, densb[i].data(), 1, densab[i].data(), 1);
 
-//construct coulomb and exchange part of the fock matrix from 2-e integrals..
+  /*construct coulomb and exchange part of the fock matrix from 2-e integrals..
+   *for the moment this definition will work. but more general definition would be 
+   *focka = (densa+densb)*v_onsite - densa*v_onsite 
+   *fockb = (densa+densb)*v_onsite - densb*v_onsite 
+   */
 
        for (int k = 0;k < norb;k++)
        {
         focka[i][k+k*norb] += densa[i][k+k*norb]*v_onsite[k];
-        fockb[i][k+k*norb] += focka[i][k+k*norb];
+        fockb[i][k+k*norb]  = focka[i][k+k*norb];
        }
 
         if (Da.norm(2) > 1e-10)
@@ -397,7 +568,6 @@ void uhf_modelh<T>::buildFock()
             //fill(fockb[i].begin(), fockb[i].end(), 0.0);
         }
     }
-
 
  for (int i = 0;i < nirrep;i++)
     {
@@ -499,7 +669,32 @@ void uhf_modelh<T>::DIISExtrap()
                      ptr_vector<SymmetryBlockedTensor<T>>{&dF});
 }
 
-INSTANTIATE_SPECIALIZATIONS(uhf_modelh);
+}
+}
 
-}
-}
+static const char* spec = R"(
+
+    frozen_core?
+        bool false,
+    convergence?
+        double 1e-12,
+    max_iterations?
+        int 150,
+    conv_type?
+        enum { MAXE, RMSE, MAE },
+    diis?
+    {
+        damping?
+            double 0.0,
+        start?
+            int 8,
+        order?
+            int 6,
+        jacobi?
+            bool false
+    }
+
+)";
+
+INSTANTIATE_SPECIALIZATIONS(aquarius::hubbard::uhf_modelh);
+REGISTER_TASK(CONCAT(aquarius::hubbard::uhf_modelh<double>), "uhf_modelH",spec);
