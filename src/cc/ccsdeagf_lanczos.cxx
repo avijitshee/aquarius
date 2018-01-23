@@ -51,7 +51,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             double delta = (to-from)/max(1,n-1);
             for (int i = 0;i < n;i++)
             {
-                omegas.emplace_back(from+delta*i, eta);
+//                omegas.emplace_back(from+delta*i, eta);
+                omegas.emplace_back(0.,2.0*i*M_PI/eta);
             }
         }
 
@@ -125,9 +126,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             Dab["ab"]  =     -L(1)["mb"  ]*T(1)["am"  ];
             Dab["ab"] -= 0.5*L(2)["kmbe"]*T(2)["aekm"];
 
-//            Gieab["ieab"] = L(2)["imab"]*T(1)["em"];
             Gieab["amef"]  = -L(2)["nmef"]*T(1)[  "an"];
-
 
             SpinorbitalTensor<U> ap ("ap"  , arena, group, {vrt,occ}, {!isvrt, isvrt}, {0,0}, isalpha ? 1 : -1);
             SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {0,0}, {!isvrt, isvrt}, isalpha ? -1 : 1);
@@ -263,7 +262,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
             U pi = 2*acos(0.0);
 
-            U piinverse = 1.0/pi ;
+            U piinverse = 1.0/M_PI ;
 
             for (auto& o : omegas)
             {
@@ -302,8 +301,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
              std::ofstream gomega;
 //             gomega.open ("gomega.dat", std::ofstream::out);
              gomega.open ("gomega.dat", ofstream::out|std::ios::app);
-             gomega << o.real() << " " << -piinverse*value.imag()*norm*norm << std::endl ; 
-//               gomega << o.real() << " " << piinverse*value.real()*norm*norm << std::endl ; 
+//             gomega << o.real() << " " << -piinverse*value.imag()*norm*norm << std::endl ; 
+              gomega << o.imag() << " " << piinverse*value.real()*norm*norm << std::endl ; 
              gomega.close();
 
               printf("real value at least: %.15f\n", value.real()*norm*norm);

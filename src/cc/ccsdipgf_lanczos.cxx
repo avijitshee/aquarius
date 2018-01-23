@@ -51,7 +51,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             double delta = (to-from)/max(1,n-1);
             for (int i = 0;i < n;i++)
             {
-                omegas.emplace_back(from+delta*i, eta);
+ //               omegas.emplace_back(from+delta*i, eta);
+                omegas.emplace_back(0.,2.0*i*M_PI/eta);
             }
         }
 
@@ -126,10 +127,28 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
             Gijak["ijak"] = L(2)["ijae"]*T(1)["ek"];
 
+//        for (int orbleft = 0; orbleft < (nI+nA))   
+//        {
+//         for (int orbright = 0; orbright < (nI+nA))   
+//          {
+//              if (orbleft >= nI)
+//              {
+//                  isvrt_left = true;
+//                  orbleft -= nI;
+//              }
+
+//              if (orbright >= nI)
+//              {
+//                  isvrt_right = true;
+//                  orbright -= nI;
+//              }
+
             SpinorbitalTensor<U> ap ("ap"  , arena, group, {vrt,occ}, {0,0}, {isvrt, !isvrt}, isalpha ? -1 : 1);
             SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {isvrt, !isvrt}, {0,0}, isalpha ? 1 : -1);
 
-            vector<tkv_pair<U>> pairs{{orbital, 1}};
+              vector<tkv_pair<U>> pairs{{orbital, 1}};
+//            vector<tkv_pair<U>> pair_left{{orbleft, 1}};
+//            vector<tkv_pair<U>> pair_right{{orbright, 1}};
 //          vector<tkv_pair<U>> pairs;
 
 //            for (int vec = 0; vec < nI; vec++) {
@@ -229,18 +248,13 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
              for (int i=0 ; i < nvec_lanczos ; i++){
                 for (int j=0 ; j < nvec_lanczos ; j++){
-
 //                 printf("print tridiagonal: %.15f\n", Tdiag[i*nvec_lanczos + j]);
-
                }
               }
             
             /*
              * Diagonalize the tridiagonal matrix to see if that produces EOM-IP values..
              */
-
-//            marray<U,3> s_tmp(s);
-//            marray<U,3> vr_tmp(vr);
 
             vector<U> l(nvec_lanczos*nvec_lanczos);
             vector<CU> s_tmp(nvec_lanczos);
@@ -271,14 +285,11 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
               value  = {0.,0.} ;
               value1 = {0.,0.} ;
-//            value = 0. ;
-//            value1 = 1. ;
 
               CU alpha_temp ;
               CU beta_temp ;
               CU gamma_temp ;
               CU com_one(1.,0.) ;
-//            o = {0.00785398163397,0.} ;
               omega = {o.real(),o.imag()} ;
 
              this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
@@ -291,7 +302,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 //            value = (1.0)/(o.real() - alpha[i] - beta[i+1]*gamma[i+1]*value1) ;                 
               value = (com_one)/(-omega + alpha_temp + beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
-//            printf("beta value: %.15f\n", beta_temp.real());
 //            printf("alpha value: %.15f\n",alpha_temp.real());
 //            printf("gamma value: %.15f\n",gamma_temp.real());
 //            printf("real value at least: %.15f\n", value.real());
@@ -300,8 +310,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
              std::ofstream gomega;
 //             gomega.open ("gomega.dat", std::ofstream::out);
-             gomega.open ("gomega.dat", ofstream::out|std::ios::app);
-               gomega << o.real() << " " << piinverse*value.imag()*norm*norm << std::endl ; 
+               gomega.open ("gomega.dat", ofstream::out|std::ios::app);
+ //              gomega << o.imag() << " " << -piinverse*value.imag()*norm*norm << std::endl ; 
+               gomega << o.imag() << " " << value.real()*norm*norm << std::endl ; 
              gomega.close();
 
               printf("real value at least: %.15f\n", value.real()*norm*norm);
@@ -310,7 +321,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 //              Nij = value*Nij ;
 //              printf("value: %.15f\n", value);
              }
-
+//          }
+//        }
             return true;
         }
 
@@ -343,10 +355,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             auto& b  = this->template gettmp<  ExcitationOperator<U,1,2>>("b");
             auto& e  = this->template gettmp<DeexcitationOperator<U,1,2>>("e");
 
-//          auto& alpha = this->template gettmp<vector<unique_vector<U>>> ("alpha");
-//          auto& beta  = this->template gettmp<vector<unique_vector<U>>>  ("beta");
-//          auto& gamma = this->template gettmp<vector<unique_vector<U>>> ("gamma");
-
             auto& alpha = this->template gettmp<unique_vector<U>> ("alpha");
             auto& beta  = this->template gettmp<unique_vector<U>> ("beta");
             auto& gamma = this->template gettmp<unique_vector<U>> ("gamma");
@@ -359,11 +367,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             U beta_temp ;
             U gamma_temp ;
 
-            printf("<FMI|FMI>: %.15f\n", scalar(FMI*FMI));
-            printf("<RL|RL>: %.15f\n", scalar(RL*RL));
-            printf("<LL1|LL1>: %.15f\n", scalar(LL(1)["m"]*LL(1)["m"]));
-            printf("<LL|LL>: %.15f\n", scalar(LL*LL));
-            printf("<LL|RL>: %.15f\n", scalar(RL*LL));
             //printf("<Rr|Ri>: %.15f\n", scalar(Rr*Ri));
 
             //printf("<B|Rr>: %.15f\n", scalar(b*Rr));
@@ -395,19 +398,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                 Y(2)["ija"] +=       XEA[  "e"]*WMNEF["ijae"];
                 Y(2)["ija"] -=     WAMEI["eiam"]*LL(2)["mje"];
                 Y(2)["ija"]  +=       FME[  "ia"]*LL(1)[  "j"];
-
-            printf("<Z1|Z1>: %.15f\n", scalar(Z(1)*Z(1)));
-            printf("<Z2|Z2>: %.15f\n", 0.5*scalar(Z(2)*Z(2)));
-            printf("<Z|Z>: %.15f\n",   scalar(Z*Z));
-            printf("<Y1|Y1>: %.15f\n", scalar(Y(1)*Y(1)));
-            printf("<Y2|Y2>: %.15f\n", 0.5* scalar(Y(2)*Y(2)));
-            printf("<Y|Y>: %.15f\n", scalar(Y*Y));
-            //printf("<Z2|Z2>: %.15f\n", 0.5*scalar(Z(2)*Z(2)));
-            //printf("<Z|Z>: %.15f\n", scalar(Z*Z));
-            //printf("<Zi|Zi>: %.15f\n", scalar(Zi*Zi));
-
-            //printf("<Ur|Ur>: %.15f\n", scalar(Z*Z));
-            //printf("<Ui|Ui>: %.15f\n", scalar(Zi*Zi));
             
             lanczos.extrapolate_tridiagonal(RL, LL, Z, Y, D, alpha, beta, gamma);
 
@@ -433,15 +423,10 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                 delta_value = old_value[nvec_lanczos-2] - value ;
               }
 
-              printf("have passed this step 1: %.10f\n", beta[beta.size()-1]);
-              printf("old_value: %.10f\n", old_value[nvec_lanczos-1]);
-              printf("new value: %.10f\n", value);
-
 //            this->conv() = max(pow(beta[beta.size()-1],2), pow(gamma[gamma.size()-1],2));
            this->conv() = max(pow(beta[beta.size()-1],2), pow(gamma[gamma.size()-1],2));
 //             this->conv() = aquarius::abs(delta_value) ;
 
-//            lanczos.getSolution(alpha, beta, gamma);
         }
 };
 

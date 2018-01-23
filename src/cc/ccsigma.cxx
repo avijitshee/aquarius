@@ -31,7 +31,7 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
         CU omega;
 
     public:
-        CCSDIPGF(const string& name, Config& config)
+        CCSDSIGMA(const string& name, Config& config)
         : Iterative<CU>(name, config), krylov_config(config.get("krylov"))
         {
             vector<Requirement> reqs;
@@ -53,5 +53,5 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
             }
         }
 
-INSTANTIATE_SPECIALIZATIONS(aquarius::cc::CCSDIPGF);
-REGISTER_TASK(aquarius::cc::CCSDIPGF<double>, "ccsdipgf",spec);
+INSTANTIATE_SPECIALIZATIONS(aquarius::cc::CCSDSIGMA);
+REGISTER_TASK(aquarius::cc::CCSDSIGMA<double>, "ccsdsigma",spec);

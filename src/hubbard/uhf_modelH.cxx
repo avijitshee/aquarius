@@ -52,10 +52,8 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
     vector<int> shapeNN = {NS,NS};
     vector<vector<int>> sizenn  = {{norb},{norb}};
 
-    this->put("Fa", new SymmetryBlockedTensor<T>("Fa", arena, symmetry::PointGroup::C1(), 2, sizenn, shapeNN, false));
+    this->put("Fa", new SymmetryBlockedTensor<T>("Fa", arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
     this->put("Fb", new SymmetryBlockedTensor<T>("Fb", arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
-//    this->put("Da", new SymmetryBlockedTensor<T>("Da", arena, PointGroup::C1(), 2, sizenn, shapeNN, true));
-//    this->put("Db", new SymmetryBlockedTensor<T>("Db", arena, PointGroup::C1(), 2, sizenn, shapeNN, true));
 
     this->puttmp("dF",     new SymmetryBlockedTensor<T>("dF",     arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
     this->puttmp("Ca",     new SymmetryBlockedTensor<T>("Ca",     arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
@@ -167,6 +165,10 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
     for (int i = 0;i < nirreps;i++)
     {
         sort(E_alpha[i].begin(), E_alpha[i].end());
+        for (int j = 0;j < norb;j++)
+        {
+         printf("orbital#:  %d energy:  %10f\n",j, E_alpha[i][j]);
+        }
         Ea[i].assign(E_alpha[i].begin()+nfrozen_alpha[i], E_alpha[i].end());
     }
 
@@ -365,7 +367,7 @@ void uhf_modelh<T>::diagonalizeFock()
 
                 info = hegv(AXBX, 'V', 'U', norb, fock.data(), norb, tmp.data(), norb, E.data());
 
-                if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
+                if (info != 0) throw runtime_error(str("check diagonalization: Info in hegv: %d", info));
 
                 assert(info == 0);
 
