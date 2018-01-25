@@ -28,9 +28,12 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
         typedef complex_type_t<U> CU;
         Config lanczos_config;
         int orbital;
+        int orbstart;
+        int orbend;
         vector<CU> omegas;
         CU omega;
         vector<U> old_value ;
+        string orb_range ;
 
     public:
         CCSDEAGF_LANCZOS(const string& name, Config& config)
@@ -40,19 +43,22 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             reqs.emplace_back("ccsd.T", "T");
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
-            this->addProduct("ccsd.eagflanczos", "gf", reqs);
+            this->addProduct("ccsd.eagflanczos", "gf_ea", reqs);
 
             orbital = config.get<int>("orbital");
             double from = config.get<double>("omega_min");
             double to = config.get<double>("omega_max");
             int n = config.get<double>("npoint");
             double eta = config.get<double>("eta");
+            double beta = config.get<double>("beta");
+            string grid_type = config.get<string>("grid");
+            orb_range = config.get<string>("orbital_range");
 
             double delta = (to-from)/max(1,n-1);
             for (int i = 0;i < n;i++)
             {
-//                omegas.emplace_back(from+delta*i, eta);
-                omegas.emplace_back(0.,2.0*i*M_PI/eta);
+             if (grid_type == "real") omegas.emplace_back(from+delta*i, eta);
+             if (grid_type == "imaginary") omegas.emplace_back(0.,2.0*i*M_PI/beta);
             }
         }
 
@@ -78,45 +84,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             auto& L = this->template get<DeexcitationOperator<U,2>>("L");
 
 
-            bool isalpha = false;
-            bool isvrt = false;
-            if (orbital > nI)
-            {
-               if (orbital <= nI)
-                {
-                    printf("why here: %10d\n", nI);
-                    isvrt = true;
-                    orbital --;
-                }
-              printf("why not here: %10d\n", orbital);
-                isalpha = true;
-                orbital -= (nI+1);
-                
-            }
-            else
-            {
-                orbital = -orbital-1;
-                if (orbital >= ni)
-                {
-                    isvrt = true;
-                    orbital -= ni;
-                }
-            }
-
-           /* vector LL means Left Lanczos and RL means Right Lanczos
-            */
-            auto& RL = this->puttmp("RL", new ExcitationOperator  <U,2,1>("RL", arena, occ, vrt, isalpha ? 1 : -1));
-            auto& LL = this->puttmp("LL", new DeexcitationOperator  <U,2,1>("LL", arena, occ, vrt, isalpha ? -1 : 1));
-            auto& Z = this->puttmp("Z", new ExcitationOperator  <U,2,1>("Z", arena, occ, vrt, isalpha ? 1 : -1));
-            auto& Y = this->puttmp("Y", new DeexcitationOperator  <U,2,1>("Y", arena, occ, vrt, isalpha ? -1 : 1));
-            auto& b  = this->puttmp("b",  new ExcitationOperator  <U,2,1>("b",  arena, occ, vrt, isalpha ? 1 : -1));
-            auto& e  = this->puttmp("e",  new DeexcitationOperator<U,2,1>("e",  arena, occ, vrt, isalpha ? -1 : 1));
-
-            auto& XMI = this->puttmp("XMI", new SpinorbitalTensor<U>("X(mi)", arena, group, {vrt,occ}, {0,1}, {0,0}, isalpha ? 1 : -1));
-            auto& GIM = this->puttmp("GIM", new SpinorbitalTensor<U>("G(im)", arena, group, {vrt,occ}, {0,0}, {0,1}, isalpha ? -1 : 1));
-            auto& alpha = this-> puttmp("alpha", new unique_vector<U>()) ;
-            auto& beta  = this-> puttmp("beta", new unique_vector<U>()) ;
-            auto& gamma = this-> puttmp("gamma", new unique_vector<U>());
+            auto& gf_ea = this-> puttmp("gf_ea", new vector<vector<vector<CU>>>) ;
 
             SpinorbitalTensor<U> Dab("D(ab)", arena, group, {vrt,occ}, {1,0}, {1,0});
             SpinorbitalTensor<U> Gieab("G(am,ef)", arena, group, {vrt,occ}, {1,1}, {2,0});
@@ -128,46 +96,209 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
             Gieab["amef"]  = -L(2)["nmef"]*T(1)[  "an"];
 
-            SpinorbitalTensor<U> ap ("ap"  , arena, group, {vrt,occ}, {!isvrt, isvrt}, {0,0}, isalpha ? 1 : -1);
-            SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {0,0}, {!isvrt, isvrt}, isalpha ? -1 : 1);
 
-            vector<tkv_pair<U>> pairs{{orbital, 1}};
+            bool isalpha_right = false;
+            bool isvrt_right = true;
+            bool isalpha_left = false;
+            bool isvrt_left = true;
+
+           if (orb_range == "full") 
+           { orbstart = 0 ;
+             orbend = nI + nA ;  
+             gf_ea.resize(omegas.size());
+             for (int i = 0;i < omegas.size();i++)
+             {
+               gf_ea[i].resize(orbend);
+             }
+             for (int i = 0;i < omegas.size();i++)
+             for (int j = 0;j < orbend;j++)
+             {
+               gf_ea[i][j].resize(orbend);
+             }
+           } 
+
+           if (orb_range == "diagonal") 
+           { orbstart = orbital-1 ;
+             orbend = orbital;  
+             gf_ea.resize(omegas.size());
+             for (int i = 0;i < omegas.size();i++)
+             {
+               gf_ea[i].resize(1);
+             }
+             for (int i = 0;i < omegas.size();i++)
+             for (int j = 0;j < 1;j++)
+             {
+               gf_ea[i][j].resize(1);
+             }
+           }
+
+          for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   
+          {
+           for (int orbright = orbstart; orbright < orbend ; orbright++)   
+            {
+
+             printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
+
+            int orbleft_dummy = orbleft ;
+            int orbright_dummy = orbright ;
+
+            if ((orbleft+1) > 0)
+            {
+                isalpha_left = true;
+                if ((orbleft ) >= nI)
+                {
+                    isvrt_left = false;
+                    orbleft_dummy = orbleft - nI;
+                }
+            }
+            else
+            {
+                orbleft = -orbital-2;
+                if (orbleft >= ni)
+                {
+                    isvrt_left = false;
+                    orbleft -= ni;
+                }
+            }
+
+            if ((orbright+1) > 0)
+            {
+                isalpha_right = true;
+                if ((orbright ) >= nI)
+                {
+                    isvrt_right = false;
+                    orbright_dummy = orbright - nI;
+                }
+            }
+            else
+            {
+                orbright = -orbital-2;
+                if (orbright >= ni)
+                {
+                    isvrt_right = false;
+                    orbright -= ni;
+                }
+            }
+
+//          bool isalpha = false;
+//          bool isvrt = false;
+//          if (orbital > nI)
+//          {
+//             if (orbital <= nI)
+//              {
+//                  isvrt = true;
+//                  orbital --;
+//              }
+//              isalpha = true;
+//              orbital -= (nI+1);
+//              
+//          }
+//          else
+//          {
+//              orbital = -orbital-1;
+//              if (orbital >= ni)
+//              {
+//                  isvrt = true;
+//                  orbital -= ni;
+//              }
+//          }
+
+           /* vector LL means Left Lanczos and RL means Right Lanczos
+            */
+            auto& RL = this->puttmp("RL", new ExcitationOperator  <U,2,1>("RL", arena, occ, vrt, isalpha_right ? 1 : -1));
+            auto& LL = this->puttmp("LL", new DeexcitationOperator  <U,2,1>("LL", arena, occ, vrt, isalpha_left ? -1 : 1));
+            auto& Z = this->puttmp("Z", new ExcitationOperator  <U,2,1>("Z", arena, occ, vrt, isalpha_right ? 1 : -1));
+            auto& Y = this->puttmp("Y", new DeexcitationOperator  <U,2,1>("Y", arena, occ, vrt, isalpha_left ? -1 : 1));
+            auto& b  = this->puttmp("b",  new ExcitationOperator  <U,2,1>("b",  arena, occ, vrt, isalpha_right ? 1 : -1));
+            auto& e  = this->puttmp("e",  new DeexcitationOperator<U,2,1>("e",  arena, occ, vrt, isalpha_left ? -1 : 1));
+
+            auto& XMI = this->puttmp("XMI", new SpinorbitalTensor<U>("X(mi)", arena, group, {vrt,occ}, {0,1}, {0,0}, isalpha_left ? 1 : -1));
+            auto& GIM = this->puttmp("GIM", new SpinorbitalTensor<U>("G(im)", arena, group, {vrt,occ}, {0,0}, {0,1}, isalpha_right ? -1 : 1));
+            auto& alpha = this-> puttmp("alpha", new unique_vector<U>()) ;
+            auto& beta  = this-> puttmp("beta", new unique_vector<U>()) ;
+            auto& gamma = this-> puttmp("gamma", new unique_vector<U>());
+
+            SpinorbitalTensor<U> ap ("ap"  , arena, group, {vrt,occ}, {!isvrt_right, isvrt_right}, {0,0}, isalpha_right ? 1 : -1);
+            SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {0,0}, {!isvrt_left, isvrt_left}, isalpha_left ? -1 : 1);
+
+//            vector<tkv_pair<U>> pairs{{orbital, 1}};
+
+            vector<tkv_pair<U>> pair_left{{orbleft_dummy, 1}};
+            vector<tkv_pair<U>> pair_right{{orbright_dummy, 1}};
+
 //          vector<tkv_pair<U>> pairs;
 
 //            for (int vec = 0; vec < nI; vec++) {
 //              pairs.push_back(tkv_pair<U>(vec, vec)) ;
 //            }
 
-            CTFTensor<U>& tensor1 = ap({!isvrt && isalpha, isvrt && isalpha}, {0,0})({0});
+            CTFTensor<U>& tensor1 = ap({!isvrt_right && isalpha_right, isvrt_right && isalpha_right}, {0,0})({0});
             if (arena.rank == 0)
-                tensor1.writeRemoteData(pairs);
+                tensor1.writeRemoteData(pair_right);
             else
                 tensor1.writeRemoteData();
 
-            CTFTensor<U>& tensor2 = apt({0,0}, {!isvrt && isalpha, isvrt && isalpha})({0});
+            CTFTensor<U>& tensor2 = apt({0,0}, {!isvrt_left && isalpha_left, isvrt_left && isalpha_left})({0});
             if (arena.rank == 0)
-                tensor2.writeRemoteData(pairs);
+                tensor2.writeRemoteData(pair_left);
             else
                 tensor2.writeRemoteData();
 
-            if (isvrt)
-            {
 
+            if ((isvrt_right) && (isvrt_left))
+            {
                 /*
                  *  ab...    abe...
                  * b  (e) = t
                  *  ijk...   ijk...
                  */
-                b(1)[  "a"] = T(1)[  "ak"]*ap["k"];
-                b(2)["abi"] = T(2)["abik"]*ap["k"];
+                b(1)[  "a"] = -T(1)[  "ak"]*ap["k"];
+                b(2)["abi"] = -T(2)["abik"]*ap["k"];
 
                 /*
                  *  ijk...   ijk...
                  * e  (e) = l
                  *  ab...    abe...
                  */
-                e(1)[  "a"]  =  L(1)[  "ka"]*apt["k"];
-                e(2)["abi"]  = -L(2)["ikab"]*apt["k"];
+                e(1)[  "a"]  = -L(1)[  "ka"]*apt["k"];
+                e(2)["iab"]  = -L(2)["ikab"]*apt["k"];
+            }
+
+            else if((isvrt_right) && (!isvrt_left))
+            {
+                /*
+                 *  ab...    abe...
+                 * b  (e) = t
+                 *  ijk...   ijk...
+                 */
+                b(1)[  "a"] = -T(1)[  "ak"]*ap["k"];
+                b(2)["abi"] = -T(2)["abik"]*ap["k"];
+
+                /*
+                 *  ijk...           ij...     ijk...
+                 * e  (m) = d  (1 + l     ) + G
+                 *  ab...    km      ab...     abm...
+                 */
+                e(1)[  "a"]  =               apt["a"];
+                e(1)[  "a"]  +=   Dab[  "ea"]*apt["e"];
+                e(2)["iab"]  =  L(1)[  "ia"]*apt["b"];
+                e(2)["iab"]  += Gieab["eiba"]*apt["e"];
+            }
+            else if((!isvrt_right) && (isvrt_left))
+            {
+                /*
+                 * b (m) = d
+                 *  i       im
+                 */
+                b(1)["a"] = ap["a"];
+
+                /*
+                 *  ijk...   ijk...
+                 * e  (e) = l
+                 *  ab...    abe...
+                 */
+                e(1)[  "a"]  = -L(1)[  "ka"]*apt["k"];
+                e(2)["iab"]  = -L(2)["ikab"]*apt["k"];
             }
             else
             {
@@ -188,6 +319,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                 e(2)["iab"]  += Gieab["eiba"]*apt["e"];
             }
 
+
             //printf("<E|E>: %.15f\n", scalar(e*e));
             //printf("<B|B>: %.15f\n", scalar(b*b));
             //printf("<E|B>: %.15f\n", scalar(e(1)["m"]*b(1)["m"])+0.5*scalar(e(2)["mne"]*b(2)["emn"]));
@@ -199,18 +331,28 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
              /* Evaluate norm 
               */ 
+//              RL(1) = b(1) ;
+//              RL(1) += e(1) ;
+//              RL(1) = 0.5*RL(1) ;
+//              LL(1) = e(1) ;
+//              LL(1) += b(1) ;
+//              LL(1) = 0.5*LL(1) ;
 
-              RL = b;
-              LL = e;
-  
+//              RL(2)["abi"] = e(2)["iab"] ;
+//              RL(2)["abi"] += b(2)["abi"] ;
+//              RL(2)["abi"] = 0.5*RL(2)["abi"] ;
+//              LL(2)["iab"] = b(2)["abi"] ;
+//              LL(2)["iab"] += e(2)["iab"] ;
+//              LL(2)["iab"] = 0.5*LL(2)["iab"] ;
+
+              RL = b ;
+              LL = e ;
               U norm = sqrt(aquarius::abs(scalar(RL*LL))); 
               RL /= norm;
               LL /= norm;
 
               printf("print norm: %10f\n", norm);
-//            Nij["ij"] = e(1)[  "i"]*b(1)[  "j"]  ;
-//            Nij["ij"]-= e(2)["ime"]*b(2)["ejm"];
-             
+
               Iterative<U>::run(dag, arena);
 
               nvec_lanczos = alpha.size() ; 
@@ -228,20 +370,10 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                }
               }    
 
-             for (int i=0 ; i < nvec_lanczos ; i++){
-                for (int j=0 ; j < nvec_lanczos ; j++){
-
-//                 printf("print tridiagonal: %.15f\n", Tdiag[i*nvec_lanczos + j]);
-
-               }
-              }
-            
             /*
              * Diagonalize the tridiagonal matrix to see if that produces EOM-EA values..
              */
 
-//            marray<U,3> s_tmp(s);
-//            marray<U,3> vr_tmp(vr);
 
             vector<U>  l(nvec_lanczos*nvec_lanczos);
             vector<CU> s_tmp(nvec_lanczos);
@@ -272,8 +404,6 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
               value  = {0.,0.} ;
               value1 = {0.,0.} ;
-//            value = 0. ;
-//            value1 = 1. ;
 
               CU alpha_temp ;
               CU beta_temp ;
@@ -291,18 +421,13 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 //            value = (1.0)/(o.real() - alpha[i] - beta[i+1]*gamma[i+1]*value1) ;                 
               value = (com_one)/(omega - alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
-//            printf("beta value: %.15f\n", beta_temp.real());
-//            printf("alpha value: %.15f\n",alpha_temp.real());
-//            printf("gamma value: %.15f\n",gamma_temp.real());
-//            printf("real value at least: %.15f\n", value.real());
-//            printf("imaginary value at least: %.15f\n", value.imag());
              }
 
              std::ofstream gomega;
 //             gomega.open ("gomega.dat", std::ofstream::out);
              gomega.open ("gomega.dat", ofstream::out|std::ios::app);
 //             gomega << o.real() << " " << -piinverse*value.imag()*norm*norm << std::endl ; 
-              gomega << o.imag() << " " << piinverse*value.real()*norm*norm << std::endl ; 
+              gomega << o.real() << " " << piinverse*value.imag()*norm*norm << std::endl ; 
              gomega.close();
 
               printf("real value at least: %.15f\n", value.real()*norm*norm);
@@ -311,7 +436,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 //              Nij = value*Nij ;
 //              printf("value: %.15f\n", value);
              }
-
+            }
+           } 
             return true;
         }
 
@@ -457,6 +583,12 @@ npoint int,
 omega_min double,
 omega_max double,
 eta double,
+grid?
+  enum{ real, imaginary },
+orbital_range?
+  enum{ diagonal, full},
+beta?
+   double 100.0 , 
 convergence?
     double 1e-12,
 max_iterations?

@@ -28,9 +28,12 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
         typedef complex_type_t<U> CU;
         Config lanczos_config;
         int orbital;
+        int orbstart;
+        int orbend;
         vector<CU> omegas;
         CU omega;
         vector<U> old_value ;
+        string orb_range ;
 
     public:
         CCSDIPGF_LANCZOS(const string& name, Config& config)
@@ -40,19 +43,21 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             reqs.emplace_back("ccsd.T", "T");
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
-            this->addProduct("ccsd.ipgflanczos", "gf", reqs);
-
+            this->addProduct("ccsd.ipgflanczos", "gf_ip", reqs);
             orbital = config.get<int>("orbital");
             double from = config.get<double>("omega_min");
             double to = config.get<double>("omega_max");
             int n = config.get<double>("npoint");
             double eta = config.get<double>("eta");
+            double beta = config.get<double>("beta");
+            string grid_type = config.get<string>("grid");
+            orb_range = config.get<string>("orbital_range");
 
             double delta = (to-from)/max(1,n-1);
             for (int i = 0;i < n;i++)
             {
- //               omegas.emplace_back(from+delta*i, eta);
-                omegas.emplace_back(0.,2.0*i*M_PI/eta);
+             if (grid_type == "real") omegas.emplace_back(from+delta*i, eta);
+             if (grid_type == "imaginary") omegas.emplace_back(0.,(2.0*i+1)*M_PI/beta);
             }
         }
 
@@ -77,97 +82,140 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             auto& T = this->template get<ExcitationOperator  <U,2>>("T");
             auto& L = this->template get<DeexcitationOperator<U,2>>("L");
 
-
-            bool isalpha = false;
-            bool isvrt = false;
-            if (orbital > 0)
-            {
-                isalpha = true;
-                orbital--;
-                if (orbital >= nI)
-                {
-                    isvrt = true;
-                    orbital -= nI;
-                }
-            }
-            else
-            {
-                orbital = -orbital-1;
-                if (orbital >= ni)
-                {
-                    isvrt = true;
-                    orbital -= ni;
-                }
-            }
-
+            bool isalpha_right = false;
+            bool isvrt_right = false;
+            bool isalpha_left = false;
+            bool isvrt_left = false;
 
            /* vector LL means Left Lanczos and RL means Right Lanczos
             */
-            auto& RL = this->puttmp("RL", new ExcitationOperator  <U,1,2>("RL", arena, occ, vrt, isalpha ? -1 : 1));
-            auto& LL = this->puttmp("LL", new DeexcitationOperator  <U,1,2>("LL", arena, occ, vrt, isalpha ? 1 : -1));
-            auto& Z = this->puttmp("Z", new ExcitationOperator  <U,1,2>("Z", arena, occ, vrt, isalpha ? -1 : 1));
-            auto& Y = this->puttmp("Y", new DeexcitationOperator  <U,1,2>("Y", arena, occ, vrt, isalpha ? 1 : -1));
-            auto& b  = this->puttmp("b",  new ExcitationOperator  <U,1,2>("b",  arena, occ, vrt, isalpha ? -1 : 1));
-            auto& e  = this->puttmp("e",  new DeexcitationOperator<U,1,2>("e",  arena, occ, vrt, isalpha ? 1 : -1));
 
-            auto& XE = this->puttmp("XE", new SpinorbitalTensor<U>("X(e)", arena, group, {vrt,occ}, {0,0}, {1,0}, isalpha ? -1 : 1));
-            auto& XEA = this->puttmp("XEA", new SpinorbitalTensor<U>("X(ea)", arena, group, {vrt,occ}, {1,0}, {0,0}, isalpha ? 1 : -1));
-            auto& alpha = this-> puttmp("alpha", new unique_vector<U>()) ;
-            auto& beta  = this-> puttmp("beta", new unique_vector<U>()) ;
-            auto& gamma = this-> puttmp("gamma", new unique_vector<U>());
-
+            auto& gf_ip = this-> puttmp("gf_ip", new vector<vector<vector<CU>>>) ;
+            
             SpinorbitalTensor<U> Dij("D(ij)", arena, group, {vrt,occ}, {0,1}, {0,1});
             SpinorbitalTensor<U> Gijak("G(ij,ak)", arena, group, {vrt,occ}, {0,2}, {1,1});
 
             SpinorbitalTensor<U> Nij("N(ij)", arena, group, {vrt,occ}, {0,1}, {0,1});
-
 
             Dij["ij"]  =     L(1)["ie"  ]*T(1)["ej"  ];
             Dij["ij"] += 0.5*L(2)["imef"]*T(2)["efjm"];
 
             Gijak["ijak"] = L(2)["ijae"]*T(1)["ek"];
 
-//        for (int orbleft = 0; orbleft < (nI+nA))   
-//        {
-//         for (int orbright = 0; orbright < (nI+nA))   
+           if (orb_range == "full") 
+           { orbstart = 0 ;
+             orbend = nI + nA ;  
+             gf_ip.resize(omegas.size());
+             for (int i = 0;i < omegas.size();i++)
+             {
+               gf_ip[i].resize(orbend);
+             }
+             for (int i = 0;i < omegas.size();i++)
+             for (int j = 0;j < orbend;j++)
+             {
+               gf_ip[i][j].resize(orbend);
+             }
+           } 
+
+           if (orb_range == "diagonal") 
+           { orbstart = orbital-1 ;
+             orbend = orbital;  
+             gf_ip.resize(omegas.size());
+             for (int i = 0;i < omegas.size();i++)
+             {
+               gf_ip[i].resize(1);
+             }
+             for (int i = 0;i < omegas.size();i++)
+             for (int j = 0;j < 1;j++)
+             {
+               gf_ip[i][j].resize(1);
+             }
+           } 
+
+          vector<CU> spec_func(omegas.size()) ;
+
+          for (int orbleft = orbstart; orbleft < nI ; orbleft++)   
+          {
+//         for (int orbright = orbstart; orbright < orbend ; orbright++)   
 //          {
-//              if (orbleft >= nI)
-//              {
-//                  isvrt_left = true;
-//                  orbleft -= nI;
-//              }
+             int orbright ;
+             orbright = orbleft ;
 
-//              if (orbright >= nI)
-//              {
-//                  isvrt_right = true;
-//                  orbright -= nI;
-//              }
+             printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
 
-            SpinorbitalTensor<U> ap ("ap"  , arena, group, {vrt,occ}, {0,0}, {isvrt, !isvrt}, isalpha ? -1 : 1);
-            SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {isvrt, !isvrt}, {0,0}, isalpha ? 1 : -1);
+            int orbleft_dummy = orbleft ;
+            int orbright_dummy = orbright ;
 
-              vector<tkv_pair<U>> pairs{{orbital, 1}};
-//            vector<tkv_pair<U>> pair_left{{orbleft, 1}};
-//            vector<tkv_pair<U>> pair_right{{orbright, 1}};
-//          vector<tkv_pair<U>> pairs;
+            if ((orbleft+1) > 0)
+            {
+                isalpha_left = true;
+                if ((orbleft ) >= nI)
+                {
+                    isvrt_left = true;
+                    orbleft_dummy = orbleft - nI;
+                }
+            }
+            else
+            {
+                orbleft = -orbital-2;
+                if (orbleft >= ni)
+                {
+                    isvrt_left = true;
+                    orbleft -= ni;
+                }
+            }
 
-//            for (int vec = 0; vec < nI; vec++) {
-//              pairs.push_back(tkv_pair<U>(vec, vec)) ;
-//            }
+            if ((orbright+1) > 0)
+            {
+                isalpha_right = true;
+                if ((orbright ) >= nI)
+                {
+                    isvrt_right = true;
+                    orbright_dummy = orbright - nI;
+                }
+            }
+            else
+            {
+                orbright = -orbital-2;
+                if (orbright >= ni)
+                {
+                    isvrt_right = true;
+                    orbright -= ni;
+                }
+            }
 
-            CTFTensor<U>& tensor1 = ap({0,0}, {isvrt && isalpha, !isvrt && isalpha})({0});
+            auto& RL = this->puttmp("RL", new ExcitationOperator  <U,1,2>("RL", arena, occ, vrt, isalpha_right ? -1 : 1));
+            auto& LL = this->puttmp("LL", new DeexcitationOperator  <U,1,2>("LL", arena, occ, vrt, isalpha_left ? 1 : -1));
+            auto& Z = this->puttmp("Z", new ExcitationOperator  <U,1,2>("Z", arena, occ, vrt, isalpha_right ? -1 : 1));
+            auto& Y = this->puttmp("Y", new DeexcitationOperator  <U,1,2>("Y", arena, occ, vrt, isalpha_left ? 1 : -1));
+            auto& b  = this->puttmp("b",  new ExcitationOperator  <U,1,2>("b",  arena, occ, vrt, isalpha_right ? -1 : 1));
+            auto& e  = this->puttmp("e",  new DeexcitationOperator<U,1,2>("e",  arena, occ, vrt, isalpha_left ? 1 : -1));
+
+            auto& XE = this->puttmp("XE", new SpinorbitalTensor<U>("X(e)", arena, group, {vrt,occ}, {0,0}, {1,0}, isalpha_right ? -1 : 1));
+            auto& XEA = this->puttmp("XEA", new SpinorbitalTensor<U>("X(ea)", arena, group, {vrt,occ}, {1,0}, {0,0}, isalpha_left ? 1 : -1));
+            auto& alpha = this-> puttmp("alpha", new unique_vector<U>()) ;
+            auto& beta  = this-> puttmp("beta", new unique_vector<U>()) ;
+            auto& gamma = this-> puttmp("gamma", new unique_vector<U>());
+
+            SpinorbitalTensor<U> ap ("ap"  , arena, group, {vrt,occ}, {0,0}, {isvrt_right, !isvrt_right}, isalpha_right ? -1 : 1);
+            SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {isvrt_left, !isvrt_left}, {0,0}, isalpha_left ? 1 : -1);
+
+            vector<tkv_pair<U>> pair_left{{orbleft_dummy, 1}};
+            vector<tkv_pair<U>> pair_right{{orbright_dummy, 1}};
+
+            CTFTensor<U>& tensor1 = ap({0,0}, {isvrt_right && isalpha_right, !isvrt_right && isalpha_right})({0});
             if (arena.rank == 0)
-                tensor1.writeRemoteData(pairs);
+                tensor1.writeRemoteData(pair_right);
             else
                 tensor1.writeRemoteData();
 
-            CTFTensor<U>& tensor2 = apt({isvrt && isalpha, !isvrt && isalpha}, {0,0})({0});
+            CTFTensor<U>& tensor2 = apt({isvrt_left && isalpha_left, !isvrt_left && isalpha_left}, {0,0})({0});
             if (arena.rank == 0)
-                tensor2.writeRemoteData(pairs);
+                tensor2.writeRemoteData(pair_left);
             else
                 tensor2.writeRemoteData();
 
-            if (isvrt)
+            if ((isvrt_right) && (isvrt_left))
             {
                 /*
                  *  ab...    abe...
@@ -185,6 +233,44 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                 e(1)[  "i"] = L(1)[  "ie"]*apt["e"];
                 e(2)["ija"] = L(2)["ijae"]*apt["e"];
             }
+            else if((isvrt_right) && (!isvrt_left))
+            {
+                /*
+                 *  ab...    abe...
+                 * b  (e) = t
+                 *  q
+                 *  ijk...   ijk...
+                 */
+                b(1)[  "i"] = T(1)[  "ei"]*ap["e"];
+                b(2)["aij"] = T(2)["aeij"]*ap["e"];
+
+                /*
+                 *  ijk...           ij...     ijk...
+                 * e  (m) = d  (1 + l     ) + G
+                 *  ab...    km      ab...     abm...
+                 */
+                e(1)[  "i"]  =               apt["i"];
+
+                e(1)[  "i"] -=   Dij[  "im"]*apt["m"];
+                e(2)["ija"]  =  L(1)[  "ia"]*apt["j"];
+                e(2)["ija"] -= Gijak["ijam"]*apt["m"];
+            }
+            else if((!isvrt_right) && (isvrt_left))
+            {
+                /*
+                 * b (m) = d
+                 *  i       im
+                 */
+                b(1)["i"] = ap["i"];
+                /*
+                 *  ijk...   ijk...
+                 * e  (e) = l
+                 *  ab...    abe...
+                 */
+                e(1)[  "i"] = L(1)[  "ie"]*apt["e"];
+                e(2)["ija"] = L(2)["ijae"]*apt["e"];
+
+            } 
             else
             {
                 /*
@@ -217,13 +303,27 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              /* Evaluate norm 
               */ 
 
-              RL = b;
-              LL = e;
-  
-              U norm = sqrt(aquarius::abs(scalar(RL*LL))); 
+                RL(1) = b(1) ;
+                RL(1) += e(1) ;
+                RL(1) = 0.5*RL(1) ;
+                LL(1) = e(1) ;
+                LL(1) += b(1) ;
+                LL(1) = 0.5*LL(1) ;
+
+                RL(2)["aij"] = e(2)["ija"] ;
+                RL(2)["aij"] += b(2)["aij"] ;
+                RL(2)["aij"] = 0.5*RL(2)["aij"] ;
+                LL(2)["ija"] = b(2)["aij"] ;
+                LL(2)["ija"] += e(2)["ija"] ;
+                LL(2)["ija"] = 0.5*LL(2)["ija"] ;
+
+              U norm = sqrt(aquarius::abs(scalar(LL*RL))); 
+              printf("print norm: %10f\n", norm);
               RL /= norm;
               LL /= norm;
 
+              norm = sqrt(aquarius::abs(scalar(e*b))); 
+              printf("print norm: %10f\n", norm);
               Nij["ij"] = e(1)[  "i"]*b(1)[  "j"]  ;
               Nij["ij"] -= e(2)["ime"]*b(2)["ejm"];
              
@@ -231,26 +331,18 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
               nvec_lanczos = alpha.size() ; 
 
-              printf("print norm: %10f\n", norm);
-
             /*Define full trdiagonal matrix 
              */  
 
               vector<U> Tdiag(nvec_lanczos*nvec_lanczos);
 
               for (int i=0 ; i < nvec_lanczos ; i++){
-                for (int j=0 ; j < nvec_lanczos ; j++){
+               for (int j=0 ; j < nvec_lanczos ; j++){
                  if (j==i) Tdiag[i*nvec_lanczos + j] = alpha[i] ; 
                  if (j==(i-1))Tdiag[i*nvec_lanczos + j] = beta[j];
                  if (j==(i+1))Tdiag[i*nvec_lanczos + j] = gamma[i];
                }
               }    
-
-             for (int i=0 ; i < nvec_lanczos ; i++){
-                for (int j=0 ; j < nvec_lanczos ; j++){
-//                 printf("print tridiagonal: %.15f\n", Tdiag[i*nvec_lanczos + j]);
-               }
-              }
             
             /*
              * Diagonalize the tridiagonal matrix to see if that produces EOM-IP values..
@@ -266,16 +358,16 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
 
             for (int i=0 ; i < nvec_lanczos ; i++){
-              printf("real eigenvalues: %.15f\n", s_tmp[i].real());
-              printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
+//              printf("real eigenvalues: %.15f\n", s_tmp[i].real());
+//              printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
              }
 
              std::ifstream iffile("gomega.dat");
              if (iffile) remove("gomega.dat");
 
-            U pi = 2*acos(0.0);
+            U piinverse = 1/M_PI ;
 
-            U piinverse = 1/pi ;
+            int omega_counter = 0 ;
 
             for (auto& o : omegas)
             {
@@ -290,7 +382,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               CU beta_temp ;
               CU gamma_temp ;
               CU com_one(1.,0.) ;
-              omega = {o.real(),o.imag()} ;
+              omega = {-o.real(),o.imag()} ;
 
              this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
 
@@ -300,29 +392,38 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               gamma_temp = {gamma[i],0.} ;
 
 //            value = (1.0)/(o.real() - alpha[i] - beta[i+1]*gamma[i+1]*value1) ;                 
-              value = (com_one)/(-omega + alpha_temp + beta_temp*gamma_temp*value1) ;                 
+              value = (com_one)/(omega + alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
-//            printf("alpha value: %.15f\n",alpha_temp.real());
-//            printf("gamma value: %.15f\n",gamma_temp.real());
-//            printf("real value at least: %.15f\n", value.real());
-//            printf("imaginary value at least: %.15f\n", value.imag());
              }
 
-             std::ofstream gomega;
-//             gomega.open ("gomega.dat", std::ofstream::out);
-               gomega.open ("gomega.dat", ofstream::out|std::ios::app);
- //              gomega << o.imag() << " " << -piinverse*value.imag()*norm*norm << std::endl ; 
-               gomega << o.imag() << " " << value.real()*norm*norm << std::endl ; 
-             gomega.close();
+             spec_func[omega_counter] += value*norm*norm;
+
+             if (orb_range == "full") gf_ip[omega_counter][orbleft][orbright] = value ;
+              printf("real value at least: %.15f\n", value.real()*norm*norm);
+             if (orb_range == "diagonal") gf_ip[omega_counter][0][0] = value ;
+
+    //       std::ofstream gomega;
+    //         gomega.open ("gomega.dat", ofstream::out|std::ios::app);
+    //         gomega << o.real() << " " << piinverse*value.imag()*norm*norm << std::endl ; 
+//  //           gomega << o.imag() << " " << value.real()*norm*norm << std::endl ; 
+    //       gomega.close();
 
               printf("real value at least: %.15f\n", value.real()*norm*norm);
               printf("imaginary value at least: %.15f\n", value.imag()*norm*norm);
-
-//              Nij = value*Nij ;
-//              printf("value: %.15f\n", value);
+              omega_counter += 1 ;
              }
-//          }
+          }
 //        }
+             U piinverse = 1/M_PI ;
+             std::ofstream gomega;
+               gomega.open ("gomega.dat", ofstream::out|std::ios::app);
+
+            for (int i=0 ; i < omegas.size() ; i++){
+               gomega << omegas[i].real() << " " << -piinverse*spec_func[i].imag() << std::endl ; 
+             }
+
+             gomega.close();
+
             return true;
         }
 
@@ -344,8 +445,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             auto& XEA = this->template gettmp<SpinorbitalTensor<U>>("XEA");
 
             auto& D = this->template gettmp<Denominator<U>>("D");
-//           auto& lanczos = this->template gettmp<Lanczos<unique_vector<U>>>("lanczos");
-//           auto& lanczos = this->template gettmp<Lanczos<ExcitationOperator<U,1,2>>>("lanczos");
             auto& lanczos = this->template gettmp<Lanczos<U,X>>("lanczos");
 
             auto& RL = this->template gettmp< ExcitationOperator<U,1,2>>("RL");
@@ -440,6 +539,12 @@ npoint int,
 omega_min double,
 omega_max double,
 eta double,
+grid?
+  enum{ real, imaginary },
+orbital_range?
+  enum{ diagonal, full},
+beta?
+   double 100.0 , 
 convergence?
     double 1e-12,
 max_iterations?
