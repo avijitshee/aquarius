@@ -1,5 +1,7 @@
 #include "util/global.hpp"
 
+#include "time/time.hpp"
+#include "task/task.hpp"
 #include "convergence/lanczos.hpp"
 #include "util/iterative.hpp"
 #include "operator/2eoperator.hpp"
@@ -7,11 +9,13 @@
 #include "operator/excitationoperator.hpp"
 #include "operator/deexcitationoperator.hpp"
 #include "operator/denominator.hpp"
+#include "hubbard/uhf_modelH.hpp"
 
 using namespace aquarius::tensor;
 using namespace aquarius::task;
 using namespace aquarius::input;
 using namespace aquarius::op;
+using namespace aquarius::hubbard;
 using namespace aquarius::convergence;
 using namespace aquarius::symmetry;
 
@@ -43,7 +47,12 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             reqs.emplace_back("ccsd.T", "T");
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
-            this->addProduct("ccsd.eagflanczos", "gf_ea", reqs);
+            reqs.emplace_back("occspace", "occ");
+            reqs.emplace_back("vrtspace", "vrt");
+            reqs.emplace_back("ccsd.ipgflanczos", "gf_ip");
+            reqs.emplace_back("Ea", "Ea");
+            reqs.emplace_back("Eb", "Eb");
+            this->addProduct(Product("ccsd.eagflanczos", "gf_ea", reqs));
 
             orbital = config.get<int>("orbital");
             double from = config.get<double>("omega_min");
@@ -58,7 +67,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             for (int i = 0;i < n;i++)
             {
              if (grid_type == "real") omegas.emplace_back(from+delta*i, eta);
-             if (grid_type == "imaginary") omegas.emplace_back(0.,2.0*i*M_PI/beta);
+             if (grid_type == "imaginary") omegas.emplace_back(0.,(2.0*i+1)*M_PI/beta);
             }
         }
 
@@ -82,9 +91,18 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
             auto& T = this->template get<ExcitationOperator  <U,2>>("T");
             auto& L = this->template get<DeexcitationOperator<U,2>>("L");
+            auto& gf_ip = this->template get<vector<vector<vector<CU>>>>("gf_ip");
+            const auto& occ_hf = this->template get<MOSpace<U>>("occ");
+            const auto& vrt_hf = this->template get<MOSpace<U>>("vrt");
 
 
-            auto& gf_ea = this-> puttmp("gf_ea", new vector<vector<vector<CU>>>) ;
+//            auto& Fa = this->template get<SymmetryBlockedTensor<U>>("Fa");
+//            auto& Fb = this->template get<SymmetryBlockedTensor<U>>("Fb");
+
+             auto& Ea = this->template get<vector<vector<real_type_t<U>>>>("Ea");
+             auto& Eb = this->template get<vector<vector<real_type_t<U>>>>("Eb");
+
+            auto& gf_ea = this-> put("gf_ea", new vector<vector<vector<CU>>>) ;
 
             SpinorbitalTensor<U> Dab("D(ab)", arena, group, {vrt,occ}, {1,0}, {1,0});
             SpinorbitalTensor<U> Gieab("G(am,ef)", arena, group, {vrt,occ}, {1,1}, {2,0});
@@ -95,12 +113,6 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             Dab["ab"] -= 0.5*L(2)["kmbe"]*T(2)["aekm"];
 
             Gieab["amef"]  = -L(2)["nmef"]*T(1)[  "an"];
-
-
-            bool isalpha_right = false;
-            bool isvrt_right = true;
-            bool isalpha_left = false;
-            bool isvrt_left = true;
 
            if (orb_range == "full") 
            { orbstart = 0 ;
@@ -132,12 +144,20 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
              }
            }
 
+          vector<CU> spec_func(omegas.size()) ;
+
+          std::ifstream iffile("gomega.dat");
+          if (iffile) remove("gomega.dat");
           for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   
           {
-           for (int orbright = orbstart; orbright < orbend ; orbright++)   
-            {
+          for (int orbright = orbstart; orbright < orbend ; orbright++)   
+          {
+            printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
 
-             printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
+            bool isalpha_right = false;
+            bool isvrt_right = true;
+            bool isalpha_left = false;
+            bool isvrt_left = true;
 
             int orbleft_dummy = orbleft ;
             int orbright_dummy = orbright ;
@@ -331,22 +351,24 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
              /* Evaluate norm 
               */ 
-//              RL(1) = b(1) ;
-//              RL(1) += e(1) ;
-//              RL(1) = 0.5*RL(1) ;
-//              LL(1) = e(1) ;
-//              LL(1) += b(1) ;
-//              LL(1) = 0.5*LL(1) ;
+                RL(1) = b(1) ;
+                RL(1) += e(1) ;
+//                RL(1) = 0.5*RL(1) ;
+                LL(1) = e(1) ;
+                LL(1) += b(1) ;
+//                LL(1) = 0.5*LL(1) ;
 
-//              RL(2)["abi"] = e(2)["iab"] ;
-//              RL(2)["abi"] += b(2)["abi"] ;
-//              RL(2)["abi"] = 0.5*RL(2)["abi"] ;
-//              LL(2)["iab"] = b(2)["abi"] ;
-//              LL(2)["iab"] += e(2)["iab"] ;
-//              LL(2)["iab"] = 0.5*LL(2)["iab"] ;
-
-              RL = b ;
+                RL(2)["abi"] = e(2)["iab"] ;
+                RL(2)["abi"] += b(2)["abi"] ;
+//                RL(2)["abi"] = 0.5*RL(2)["abi"] ;
+                LL(2)["iab"] = b(2)["abi"] ;
+                LL(2)["iab"] += e(2)["iab"] ;
+//                LL(2)["iab"] = 0.5*LL(2)["iab"] ;
+            if (orbright == orbleft)
+            { RL = b ;
               LL = e ;
+            }
+
               U norm = sqrt(aquarius::abs(scalar(RL*LL))); 
               RL /= norm;
               LL /= norm;
@@ -374,7 +396,6 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
              * Diagonalize the tridiagonal matrix to see if that produces EOM-EA values..
              */
 
-
             vector<U>  l(nvec_lanczos*nvec_lanczos);
             vector<CU> s_tmp(nvec_lanczos);
             vector<U>  vr_tmp(nvec_lanczos*nvec_lanczos);
@@ -389,13 +410,9 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
              }
 
-            std::ifstream iffile("gomega.dat");
-            if (iffile) remove("gomega.dat");
-
-            U pi = 2*acos(0.0);
-
             U piinverse = 1.0/M_PI ;
 
+            int omega_counter = 0 ;
             for (auto& o : omegas)
             {
 
@@ -418,26 +435,155 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               beta_temp  = {beta[i],0.} ;
               gamma_temp = {gamma[i],0.} ;
 
-//            value = (1.0)/(o.real() - alpha[i] - beta[i+1]*gamma[i+1]*value1) ;                 
               value = (com_one)/(omega - alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
              }
 
-             std::ofstream gomega;
-//             gomega.open ("gomega.dat", std::ofstream::out);
-             gomega.open ("gomega.dat", ofstream::out|std::ios::app);
-//             gomega << o.real() << " " << -piinverse*value.imag()*norm*norm << std::endl ; 
-              gomega << o.real() << " " << piinverse*value.imag()*norm*norm << std::endl ; 
-             gomega.close();
+             if (orbright == orbleft) spec_func[omega_counter] += value*norm*norm;
+             if (orb_range == "full") gf_ea[omega_counter][orbleft][orbright] = value*norm*norm ;
+             if (orb_range == "diagonal") gf_ea[omega_counter][0][0] = value*norm*norm ;
+  //         std::ofstream gomega;
+////           gomega.open ("gomega.dat", std::ofstream::out);
+  //         gomega.open ("gomega.dat", ofstream::out|std::ios::app);
+////           gomega << o.real() << " " << -piinverse*value.imag()*norm*norm << std::endl ; 
+  //          gomega << o.real() << " " << piinverse*value.imag()*norm*norm << std::endl ; 
+  //         gomega.close();
 
-              printf("real value at least: %.15f\n", value.real()*norm*norm);
-              printf("imaginary value at least: %.15f\n", value.imag()*norm*norm);
+              printf("real value : %.15f\n", value.real()*norm*norm);
+              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
+              omega_counter += 1 ;
 
-//              Nij = value*Nij ;
-//              printf("value: %.15f\n", value);
              }
             }
            } 
+               U piinverse = 1/M_PI ;
+               std::ofstream gomega;
+               gomega.open ("gomega_ea.dat", ofstream::out|std::ios::app);
+
+            for (int i=0 ; i < omegas.size() ; i++){
+               gomega << omegas[i].real() << " " <<(-1/M_PI)*spec_func[i].imag() << std::endl ; 
+             }
+
+             gomega.close();
+
+         const SymmetryBlockedTensor<U>& cA_ = vrt_hf.Calpha;
+         const SymmetryBlockedTensor<U>& ca_ = vrt_hf.Cbeta;
+         const SymmetryBlockedTensor<U>& cI_ = occ_hf.Calpha;
+         const SymmetryBlockedTensor<U>& ci_ = occ_hf.Cbeta;
+
+         int nirreps = 1;
+
+         vector<vector<U>> cA(nirreps), ca(nirreps), cI(nirreps), ci(nirreps);
+
+         const vector<int>& N = occ_hf.nao;
+ 
+         int norb = N[0]; 
+ 
+         for (int i = 0;i < nirreps;i++)
+         {
+           vector<int> irreps = {i,i};
+           cA_.getAllData(irreps, cA[i]);
+           assert(cA[i].size() == N[i]*nA[i]);
+           ca_.getAllData(irreps, ca[i]);
+           assert(ca[i].size() == N[i]*na[i]);
+           cI_.getAllData(irreps, cI[i]);
+           assert(cI[i].size() == N[i]*nI[i]);
+           ci_.getAllData(irreps, ci[i]);
+           assert(ci[i].size() == N[i]*ni[i]);
+         }        
+
+    vector<U> c_full ; 
+     
+    for (int i = 0;i < nirreps;i++)
+    {
+      c_full.insert(c_full.begin(),cI[i].begin(),cI[i].end());
+
+      c_full.insert(c_full.end(),cA[i].begin(),cA[i].end());
+    }
+
+    vector<U> fock;
+
+    for (int i = 0;i < nirreps;i++)
+    {
+        fock.assign(Ea[i].begin(), Ea[i].end());
+    }
+
+        U new_value ;
+
+       for (int i = 0; i < 1; i++) 
+       {
+        for (int p = 0; p < norb ;p++)
+        {
+               new_value = new_value + c_full[p*norb+i]*c_full[p*norb+i]*fock[p] ; 
+            }
+         }
+
+         printf("value of AO fock  %10f\n",new_value);
+
+    vector<CU> gf_ao(omegas.size(),{0.,0.}) ;
+    vector<CU> self_energy_ao(omegas.size(),{0.,0.}) ;
+
+    for (int omega = 0; omega < omegas.size() ;omega++)
+    {
+      vector<int> ipiv(norb) ;
+      vector<CU> gf_tmp(norb*norb) ;
+      vector<CU> gf_zero_inv(norb*norb) ;
+      for (int p = 0; p < norb ;p++)
+      {
+        for (int q = 0; q < norb ;q++)
+        {
+          if (q == p)
+          {
+            gf_zero_inv[p*norb+q] = omegas[omega] - fock[q] ;
+            gf_tmp[p*norb+q] = gf_ip[omega][p][q] + gf_ea[omega][p][q] ; 
+//            gf_tmp[p*norb+q] =  gf_ip[omega][p][q] ; 
+          }
+          if (q != p )
+          { 
+            gf_zero_inv[p*norb+q] =  {0.,0.} ;
+            gf_tmp[p*norb+q]  = 0.5*( gf_ip[omega][p][q] - gf_ip[omega][p][p] - gf_ip[omega][q][q]) ; 
+            gf_tmp[p*norb+q] += 0.5*( gf_ea[omega][p][q] - gf_ea[omega][p][p] - gf_ea[omega][q][q]) ; 
+
+//            gf_tmp[p*norb+q]  = 0.5*( gf_ip[omega][p][q] - gf_ip[omega][p][p] - gf_ip[omega][q][q]) ; 
+//            gf_tmp[p*norb+q] += 0.5*( gf_ea[omega][p][q] - gf_ea[omega][p][p] - gf_ea[omega][q][q]) ; 
+          }
+//           printf("Real and Imaginary value of the Green's function %10f %15f %15f\n",omegas[omega].imag(), gf_tmp[0].real(), gf_tmp[0].imag());
+
+          for (int i = 0; i < 1; i++) 
+          {
+            gf_ao[omega] = gf_ao[omega] + c_full[p*norb+i]*c_full[q*norb+i]*gf_tmp[p*norb+q] ; 
+          }  
+        }
+      }
+
+// Dyson Equation  
+
+            getrf( norb, norb, gf_tmp.data(), norb, ipiv.data() ) ;
+
+            getri( norb, gf_tmp.data(), norb, ipiv.data()) ;
+
+            axpy (norb*norb, -1.0, gf_tmp.data(), 1, gf_zero_inv.data(), 1);
+       
+            for (int p = 0; p < norb ;p++)
+             {
+             for (int q = 0; q < norb ;q++)
+              {
+               for (int i = 0; i < 1; i++) 
+                {
+                 self_energy_ao[omega] = self_energy_ao[omega] + c_full[p*norb+i]*c_full[q*norb+i]*gf_zero_inv[p*norb+q] ; 
+                }
+              }
+             }
+
+             std::ofstream gomega;
+             gomega.open ("gomega.dat", ofstream::out|std::ios::app);
+              gomega << omegas[omega].real() << " " << gf_ao[omega].real() << " " << gf_ao[omega].imag() << std::endl ; 
+             gomega.close();
+
+            printf("Real and Imaginary value of the Green's function %10f %15f %15f\n",omegas[omega].real(), gf_ao[omega].real(), -(1.0/M_PI)*gf_ao[omega].imag());
+//           printf("Self Energy real and imaginary  %10f %15f %15f\n",omegas[omega].imag(), self_energy_ao[omega].real(), self_energy_ao[omega].imag());
+
+    } 
             return true;
         }
 

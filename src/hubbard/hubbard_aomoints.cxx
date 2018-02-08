@@ -86,13 +86,23 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
 //      ijklpairs.emplace_back(k*norb*norb+k, v_onsite[i]);
 //  }
 
-    for (int i = 0; i < nocc ; i++)
+    for (int i = 0; i < norb ; i++)
     {
-    for (int j = 0; j < 1 ; j++)
+    for (int j = 0; j < norb ; j++)
     {
-     printf("Print mo, ao and coefficient: %d %d %.15f\n ",i,j,ci[0][i*norb+j]);
+//     printf("Print mo, ao and coefficient: %d %d %.15f\n ",i,j,Ea[0][i*norb+j]);
     }
     }
+
+    for (int i = 0; i < nirreps ; i++)
+    {
+    for (int j = 0; j < norb ; j++)
+    {
+//     printf("Print mo, ao and coefficient: %d %d %.15f\n ",i,j,Ea[i][j]);
+    }
+    }
+
+
 
     /*
      * <ab||ij>
@@ -200,7 +210,9 @@ void Hubbard_AOMOints<U>::writeIntegrals(bool pvirt, bool qvirt, bool rvirt, boo
 //   vector<U> buf2(nr*ns,0.0) ;
 //   vector<U> buf3(np*nq*nr*ns,0.0) ;
 
-     vector<double> v_onsite = {4.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000};   
+    read_2e_integrals() ; 
+
+//     vector<double> v_onsite = {8.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000};   
 
 //  for (int i = 0; i < norb ; i++)
 //  {

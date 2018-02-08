@@ -35,8 +35,6 @@ uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
     this->addProduct(Product("Eb", "Eb", reqs));
     this->addProduct(Product("Fa", "Fa", reqs));
     this->addProduct(Product("Fb", "Fb", reqs));
-//    this->addProduct(Product("Da", "Da", reqs));
-//    this->addProduct(Product("Db", "Db", reqs));
 }
 
 template <typename T>
@@ -524,7 +522,10 @@ void uhf_modelh<T>::buildFock()
     vector<vector<T>> focka(nirrep), fockb(nirrep);
     vector<vector<T>> densa(nirrep), densb(nirrep);
     vector<vector<T>> densab(nirrep);
-    vector<T> v_onsite = {4.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0} ;
+
+    read_2e_integrals();
+
+//    vector<T> v_onsite = {8.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0} ;
 
     for (int i = 0;i < nirrep;i++)
     {

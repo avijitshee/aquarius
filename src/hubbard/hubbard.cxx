@@ -38,6 +38,9 @@ bool Hubbard<U>::run(TaskDAG& dag, const Arena& arena)
 
     int nvrt = norb-nocc;
 
+    read_dia_integrals() ; 
+    read_offdia_integrals() ; 
+    read_2e_integrals() ; 
 
    /*In the following we define the one-electronic AO/site integrals for Hubbard model..
     */ 

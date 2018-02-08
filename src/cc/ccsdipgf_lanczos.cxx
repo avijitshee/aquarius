@@ -1,5 +1,7 @@
 #include "util/global.hpp"
 
+#include "time/time.hpp"
+#include "task/task.hpp"
 #include "convergence/lanczos.hpp"
 #include "util/iterative.hpp"
 #include "operator/2eoperator.hpp"
@@ -43,7 +45,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             reqs.emplace_back("ccsd.T", "T");
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
-            this->addProduct("ccsd.ipgflanczos", "gf_ip", reqs);
+            this->addProduct(Product("ccsd.ipgflanczos", "gf_ip", reqs));
             orbital = config.get<int>("orbital");
             double from = config.get<double>("omega_min");
             double to = config.get<double>("omega_max");
@@ -82,15 +84,11 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             auto& T = this->template get<ExcitationOperator  <U,2>>("T");
             auto& L = this->template get<DeexcitationOperator<U,2>>("L");
 
-            bool isalpha_right = false;
-            bool isvrt_right = false;
-            bool isalpha_left = false;
-            bool isvrt_left = false;
 
            /* vector LL means Left Lanczos and RL means Right Lanczos
             */
 
-            auto& gf_ip = this-> puttmp("gf_ip", new vector<vector<vector<CU>>>) ;
+            auto& gf_ip = this-> put("gf_ip", new vector<vector<vector<CU>>>) ;
             
             SpinorbitalTensor<U> Dij("D(ij)", arena, group, {vrt,occ}, {0,1}, {0,1});
             SpinorbitalTensor<U> Gijak("G(ij,ak)", arena, group, {vrt,occ}, {0,2}, {1,1});
@@ -134,14 +132,18 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
           vector<CU> spec_func(omegas.size()) ;
 
-          for (int orbleft = orbstart; orbleft < nI ; orbleft++)   
+          for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   
           {
-//         for (int orbright = orbstart; orbright < orbend ; orbright++)   
-//          {
-             int orbright ;
-             orbright = orbleft ;
+           for (int orbright = orbstart; orbright < orbend ; orbright++)   
+            {
+              old_value.clear() ;             
 
              printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
+
+            bool isalpha_right = false;
+            bool isvrt_right = false;
+            bool isalpha_left = false;
+            bool isvrt_left = false;
 
             int orbleft_dummy = orbleft ;
             int orbright_dummy = orbright ;
@@ -200,8 +202,20 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             SpinorbitalTensor<U> ap ("ap"  , arena, group, {vrt,occ}, {0,0}, {isvrt_right, !isvrt_right}, isalpha_right ? -1 : 1);
             SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {isvrt_left, !isvrt_left}, {0,0}, isalpha_left ? 1 : -1);
 
-            vector<tkv_pair<U>> pair_left{{orbleft_dummy, 1}};
-            vector<tkv_pair<U>> pair_right{{orbright_dummy, 1}};
+          vector<tkv_pair<U>> pair_left{{orbleft_dummy, 1}};
+//          vector<tkv_pair<U>> pair_left{{orbright_dummy, 1}};
+          vector<tkv_pair<U>> pair_right{{orbright_dummy, 1}};
+//          vector<tkv_pair<U>> pair_right{{orbleft_dummy, 1}};
+
+
+//        vector<tkv_pair<U>> pair_left;
+//        vector<tkv_pair<U>> pair_right;
+
+//        pair_left.push_back(tkv_pair<double>(orbleft_dummy,1)) ;
+//        pair_left.push_back(tkv_pair<double>(orbright_dummy,1)) ;
+
+//        pair_right.push_back(tkv_pair<double>(orbleft_dummy,1)) ;
+//        pair_right.push_back(tkv_pair<double>(orbright_dummy,1)) ;
 
             CTFTensor<U>& tensor1 = ap({0,0}, {isvrt_right && isalpha_right, !isvrt_right && isalpha_right})({0});
             if (arena.rank == 0)
@@ -273,6 +287,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             } 
             else
             {
+              printf("I should be here inside the dressing of creation op: %10f\n", 10.5);
                 /*
                  * b (m) = d
                  *  i       im
@@ -302,28 +317,30 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
              /* Evaluate norm 
               */ 
-
+               
                 RL(1) = b(1) ;
                 RL(1) += e(1) ;
-                RL(1) = 0.5*RL(1) ;
                 LL(1) = e(1) ;
                 LL(1) += b(1) ;
-                LL(1) = 0.5*LL(1) ;
 
                 RL(2)["aij"] = e(2)["ija"] ;
                 RL(2)["aij"] += b(2)["aij"] ;
-                RL(2)["aij"] = 0.5*RL(2)["aij"] ;
                 LL(2)["ija"] = b(2)["aij"] ;
                 LL(2)["ija"] += e(2)["ija"] ;
-                LL(2)["ija"] = 0.5*LL(2)["ija"] ;
 
-              U norm = sqrt(aquarius::abs(scalar(LL*RL))); 
+              if (orbright == orbleft)
+              {
+                RL = b ;
+                LL = e ;
+              }
+
+              U norm = sqrt(aquarius::abs(scalar(RL*LL))); 
               printf("print norm: %10f\n", norm);
               RL /= norm;
               LL /= norm;
 
-              norm = sqrt(aquarius::abs(scalar(e*b))); 
-              printf("print norm: %10f\n", norm);
+//              norm = sqrt(aquarius::abs(scalar(e*b))); 
+//              printf("print norm: %10f\n", norm);
               Nij["ij"] = e(1)[  "i"]*b(1)[  "j"]  ;
               Nij["ij"] -= e(2)["ime"]*b(2)["ejm"];
              
@@ -362,8 +379,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 //              printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
              }
 
-             std::ifstream iffile("gomega.dat");
-             if (iffile) remove("gomega.dat");
+             std::ifstream iffile("gomega_ip.dat");
+             if (iffile) remove("gomega_ip.dat");
 
             U piinverse = 1/M_PI ;
 
@@ -371,10 +388,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
             for (auto& o : omegas)
             {
-
-            /*Evaluate continued fraction 
-             */
-
               value  = {0.,0.} ;
               value1 = {0.,0.} ;
 
@@ -382,25 +395,27 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               CU beta_temp ;
               CU gamma_temp ;
               CU com_one(1.,0.) ;
-              omega = {-o.real(),o.imag()} ;
+              omega = {o.real(),o.imag()} ;
+//             omega = {-o.real(),o.imag()} ;
 
              this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
+
+            /*Evaluate continued fraction 
+             */
 
              for(int i=(nvec_lanczos-1);i >= 0;i--){  
               alpha_temp = {alpha[i],0.} ;
               beta_temp  = {beta[i],0.} ;
               gamma_temp = {gamma[i],0.} ;
 
-//            value = (1.0)/(o.real() - alpha[i] - beta[i+1]*gamma[i+1]*value1) ;                 
               value = (com_one)/(omega + alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
              }
 
-             spec_func[omega_counter] += value*norm*norm;
+            if(orbright==orbleft) spec_func[omega_counter] += value*norm*norm;
 
-             if (orb_range == "full") gf_ip[omega_counter][orbleft][orbright] = value ;
-              printf("real value at least: %.15f\n", value.real()*norm*norm);
-             if (orb_range == "diagonal") gf_ip[omega_counter][0][0] = value ;
+             if (orb_range == "full") gf_ip[omega_counter][orbleft][orbright] = value*norm*norm ;
+             if (orb_range == "diagonal") gf_ip[omega_counter][0][0] = value*norm*norm ;
 
     //       std::ofstream gomega;
     //         gomega.open ("gomega.dat", ofstream::out|std::ios::app);
@@ -408,18 +423,18 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 //  //           gomega << o.imag() << " " << value.real()*norm*norm << std::endl ; 
     //       gomega.close();
 
-              printf("real value at least: %.15f\n", value.real()*norm*norm);
-              printf("imaginary value at least: %.15f\n", value.imag()*norm*norm);
+              printf("real value : %.15f\n", value.real()*norm*norm);
+              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
               omega_counter += 1 ;
              }
           }
-//        }
+        }
              U piinverse = 1/M_PI ;
              std::ofstream gomega;
-               gomega.open ("gomega.dat", ofstream::out|std::ios::app);
+               gomega.open ("gomega_ip.dat", ofstream::out|std::ios::app);
 
             for (int i=0 ; i < omegas.size() ; i++){
-               gomega << omegas[i].real() << " " << -piinverse*spec_func[i].imag() << std::endl ; 
+               gomega << omegas[i].real() << " " << -1/M_PI*spec_func[i].imag() << std::endl ; 
              }
 
              gomega.close();
@@ -509,7 +524,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               alpha_temp = alpha[i] ;
               beta_temp  = beta[i] ;
               gamma_temp = gamma[i] ;
-              value = 1.0/(alpha_temp + beta_temp*gamma_temp*value1) ;                 
+              value = 1.0/(alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
               }
              }
@@ -523,8 +538,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               }
 
 //            this->conv() = max(pow(beta[beta.size()-1],2), pow(gamma[gamma.size()-1],2));
-           this->conv() = max(pow(beta[beta.size()-1],2), pow(gamma[gamma.size()-1],2));
-//             this->conv() = aquarius::abs(delta_value) ;
+              this->conv() = max(pow(beta[beta.size()-1],2), pow(gamma[gamma.size()-1],2));
+//            this->conv() = aquarius::abs(delta_value) ;
 
         }
 };

@@ -26,6 +26,7 @@ __top_builddir__bin_aquarius_SOURCES = \
 	src/cc/ccsd_tq_n.cxx \
 	src/cc/ccsd.cxx \
 	src/cc/ccsdipgf.cxx \
+	src/cc/ccsigma.cxx \
 	src/cc/ccsdipgf_lanczos.cxx \
 	src/cc/ccsdeagf_lanczos.cxx \
 	src/cc/ccsdtipgf.cxx \
@@ -68,6 +69,7 @@ __top_builddir__bin_aquarius_SOURCES = \
 	src/cc/xieomeeccsd.cxx \
 	src/cc/xieomeeccsdt.cxx \
 	src/cc/zetaccsd.cxx \
+	src/cc/mocoeff.cxx \
 	src/cc/zetaccsdt.cxx \
 	\
 	src/input/basis.cxx \

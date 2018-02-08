@@ -37,6 +37,8 @@ class uhf_modelh : public Iterative<T>
         bool run(task::TaskDAG& dag, const Arena& arena);
 
     protected:
+
+        vector<T> v_onsite ;
 //        virtual void calcSMinusHalf() = 0;
         void calcSMinusHalf() ;
 
@@ -53,7 +55,21 @@ class uhf_modelh : public Iterative<T>
         void calcDensity();
 
         void DIISExtrap() ;
-       
+
+        void read_2e_integrals()
+        {
+          std::ifstream onsite("onsite.txt");
+          std::istream_iterator<T> start(onsite), end;
+          std::vector<T> int_onsite(start, end);
+          std::cout << "Read " << int_onsite.size() << " numbers" << std::endl;
+
+  // print the numbers to stdout
+         std::cout << "numbers read in:\n";
+         std::copy(int_onsite.begin(), int_onsite.end(), 
+         std::ostream_iterator<double>(std::cout, " "));
+         std::cout << std::endl;
+         v_onsite.insert(v_onsite.begin(),int_onsite.begin(),int_onsite.end());  
+       }
 
 };
 

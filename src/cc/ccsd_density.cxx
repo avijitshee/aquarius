@@ -20,6 +20,8 @@ namespace cc
 template <typename U>
 class CCSDDensity : public Task
 {
+    protected:
+        typedef complex_type_t<U> CU;
     public:
         CCSDDensity(const string& name, Config& config)
         : Task(name, config)
@@ -115,6 +117,60 @@ class CCSDDensity : public Task
             GAIJK *= -1;
             GABCI *= -1;
 
+// build full CCSD density matrix and then diagonalize to obtain natural orbital occupancies..
+
+           vector<U> oo ;
+           vector<U> ov ;
+           vector<U> vo ;
+           vector<U> vv ;
+              
+           DAI({1,0},{0,1})({0,0}).getAllData(vo); 
+           DIA({0,1},{1,0}).getAllData({0,0}, ov);
+           DAB({1,0},{1,0}).getAllData({0,0}, vv);
+           DIJ({0,0},{0,0}).getAllData({0,0}, oo);
+
+           int nI = occ.nalpha[0];
+           int ni = occ.nbeta[0];
+           int nA = vrt.nalpha[0];
+           int na = vrt.nbeta[0];
+
+           int norb = nI + nA ; 
+
+           vector<U> density(norb*norb) ;
+
+
+           for (int i=0 ; i < norb ; i++){
+             oo[i*nI+i] += 1.0 ;
+           }
+ 
+           for (int i=0 ; i < norb ; i++){
+            for (int j=0 ; j < norb ; j++){
+             if ((i < nI) && (j < nI)) density[i*norb+j] = 2.0*oo[i*nI+j] ; 
+             if ((i < nI) && (j >= nI)) density[i*norb+j] = 2.0*ov[i*nA+(j-nI)] ; 
+             if ((i >= nI) && (j < nI)) density[i*norb+j] = 2.0*vo[(i-nI)*nI+j] ; 
+             if ((i >= nI) && (j >= nI)) density[i*norb+j] = 2.0*vv[(i-nI)*nA+(j-nI)] ; 
+            }
+           } 
+
+            vector<U> l(norb*norb);
+            vector<CU> s_tmp(norb);
+            vector<U> vr_tmp(norb*norb);
+
+            int info = geev('N', 'V', norb, density.data(), norb,
+                        s_tmp.data(), l.data(), norb,
+                        vr_tmp.data(), norb);
+            if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
+
+           U value = 0. ; 
+
+            cout<<" #orbital occupation" <<endl ;
+
+            for (int i=0 ; i < norb ; i++){
+                printf(" %d %.15f\n",i, s_tmp[i].real());
+                value += s_tmp[i].real();
+             }
+                printf("total occupancy: %.15f\n", value);
+
             U EIA = scalar(DIA*H.getIA());
             U EAI = scalar(DAI*H.getAI());
             U EAB = scalar(DAB*H.getAB());
@@ -158,6 +214,7 @@ class CCSDDensity : public Task
 
             return true;
         }
+        bool greater(CU i, CU j) { return i > j; }
 };
 
 }
