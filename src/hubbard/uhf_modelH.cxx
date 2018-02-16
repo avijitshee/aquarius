@@ -20,7 +20,7 @@ uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
   diis(config.get("diis"), 2)
 {
     vector<Requirement> reqs;
-//    reqs += Requirement("molecule", "molecule");
+    reqs += Requirement("hubbard", "hubbard");
     reqs += Requirement("hubbard_S", "S");
     reqs += Requirement("hubbard_1eints", "H");
     reqs += Requirement("Da", "Da");
@@ -40,15 +40,14 @@ uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
 template <typename T>
 bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 {
-//    int nalpha = molecule.getNumAlphaElectrons();
-//    int nbeta = molecule.getNumBetaElectrons();
-    int nirreps = 1 ;
-    int norb = 12 ;
-    int nalpha = norb/2;
-    int nbeta = norb/2;
-        
-    vector<int> shapeNN = {NS,NS};
-    vector<vector<int>> sizenn  = {{norb},{norb}};
+   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   int norb = hubbard.getNumOrbitals();
+   int nalpha = hubbard.getNumAlphaElectrons();
+   int nbeta = hubbard.getNumBetaElectrons();
+   int nirreps = hubbard.getNumIrreps() ;
+
+   vector<int> shapeNN = {NS,NS};
+   vector<vector<int>> sizenn  = {{norb},{norb}};
 
     this->put("Fa", new SymmetryBlockedTensor<T>("Fa", arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
     this->put("Fb", new SymmetryBlockedTensor<T>("Fb", arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
@@ -163,16 +162,17 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
     for (int i = 0;i < nirreps;i++)
     {
         sort(E_alpha[i].begin(), E_alpha[i].end());
-        for (int j = 0;j < norb;j++)
-        {
-         printf("orbital#:  %d energy:  %10f\n",j, E_alpha[i][j]);
-        }
+        
         Ea[i].assign(E_alpha[i].begin()+nfrozen_alpha[i], E_alpha[i].end());
     }
 
     for (int i = 0;i < nirreps;i++)
     {
         sort(E_beta[i].begin(), E_beta[i].end());
+        for (int j = 0;j < norb;j++)
+        {
+         printf("orbital#:  %d energy: %10f %10f\n",j, E_alpha[i][j], E_beta[i][j]);
+        }
         Eb[i].assign(E_beta[i].begin()+nfrozen_beta[i], E_beta[i].end());
     }
 
@@ -182,17 +182,11 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 template <typename T>
 void uhf_modelh<T>::iterate(const Arena& arena)
 {
-//  const Molecule& molecule = this->template get<Molecule>("molecule");
-
-//  int nalpha = molecule.getNumAlphaElectrons();
-//  int nbeta = molecule.getNumBetaElectrons();
-
-    int nirreps ;
-    int norb ;
-    nirreps = 1 ;
-    norb = 12 ;
-    int nalpha = norb/2;
-    int nbeta = norb/2;
+   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   int norb = hubbard.getNumOrbitals();
+   int nalpha = hubbard.getNumAlphaElectrons();
+   int nbeta = hubbard.getNumBetaElectrons();
+   int nirreps = hubbard.getNumIrreps() ;
 
     buildFock();
     DIISExtrap();
@@ -251,12 +245,11 @@ void uhf_modelh<T>::iterate(const Arena& arena)
 template <typename T>
 void uhf_modelh<T>::calcSMinusHalf()
 {
-//  auto Hubbard& hubbard = this->template get<Hubbard>("hubbard");
-//  const norb = hubbard.getNumOrbitals();
-//  int nirreps = hubbard.getNumIrreps();
-
-    int norb = 12;
-    int nirreps = 1;
+   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   const int norb = hubbard.getNumOrbitals();
+   int nalpha = hubbard.getNumAlphaElectrons();
+   int nbeta = hubbard.getNumBetaElectrons();
+   int nirreps = hubbard.getNumIrreps() ;
 
     auto& S = this->template get<SymmetryBlockedTensor<T>>("S");
     auto& Smhalf = this->template gettmp<SymmetryBlockedTensor<T>>("S^-1/2");
@@ -316,11 +309,11 @@ void uhf_modelh<T>::calcSMinusHalf()
 template <typename T>
 void uhf_modelh<T>::diagonalizeFock()
 {
-//  const Molecule& molecule = this->template get<Molecule>("molecule");
-//  const vector<int>& norb = molecule.getNumOrbitals();
-
-    int norb = 12 ;
-    int nirreps = 1 ;
+   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   const int norb = hubbard.getNumOrbitals();
+   int nalpha = hubbard.getNumAlphaElectrons();
+   int nbeta = hubbard.getNumBetaElectrons();
+   int nirreps = hubbard.getNumIrreps() ;
 
     auto& S  = this->template get   <SymmetryBlockedTensor<T>>("S");
     auto& Fa = this->template get   <SymmetryBlockedTensor<T>>("Fa");
@@ -391,7 +384,6 @@ void uhf_modelh<T>::diagonalizeFock()
                     pairs[j].k = j;
                     pairs[j].d = fock[j];
                 }
-
                 C.writeRemoteData(irreps, pairs);
             }
         }
@@ -411,13 +403,11 @@ void uhf_modelh<T>::diagonalizeFock()
 template <typename T>
 void uhf_modelh<T>::calcS2()
 {
-//  const auto& molecule = this->template get<Molecule>("molecule");
-//  int nalpha = molecule.getNumAlphaElectrons();
-//  int nbeta = molecule.getNumBetaElectrons();
-    int nirreps = 1 ;
-    int norb = 12 ;
-    int nalpha = norb/2;
-    int nbeta  = norb/2;
+   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   const int norb = hubbard.getNumOrbitals();
+   int nalpha = hubbard.getNumAlphaElectrons();
+   int nbeta = hubbard.getNumBetaElectrons();
+   int nirreps = hubbard.getNumIrreps() ;
 
     auto& S = this->template get<SymmetryBlockedTensor<T>>("S"); // this must be set to a unit matrix
 
@@ -447,7 +437,6 @@ void uhf_modelh<T>::calcS2()
 template <typename T>
 void uhf_modelh<T>::calcEnergy()
 {
-//    const Molecule& molecule = this->template get<Molecule>("molecule");
 
     auto& H  = this->template get<SymmetryBlockedTensor<T>>("H");
     auto& Fa = this->template get<SymmetryBlockedTensor<T>>("Fa");
@@ -462,7 +451,8 @@ void uhf_modelh<T>::calcEnergy()
      */
     Fa["ab"] += H["ab"];
     Fb["ab"] += H["ab"];
-//    this->energy()  = molecule.getNuclearRepulsion();
+
+//    this->energy()  = hubbard.getNuclearRepulsion();
     this->energy()  = 0.5*scalar(Da["ab"]*Fa["ab"]);
     this->energy() += 0.5*scalar(Db["ab"]*Fb["ab"]);
     Fa["ab"] -= H["ab"];
@@ -472,15 +462,11 @@ void uhf_modelh<T>::calcEnergy()
 template <typename T>
 void uhf_modelh<T>::calcDensity()
 {
-//    const Molecule& molecule = this->template get<Molecule>("molecule");
-
-//    const vector<int>& norb = molecule.getNumOrbitals();
-//  int nalpha = molecule.getNumAlphaElectrons();
-//  int nbeta = molecule.getNumBetaElectrons();
-    int nirreps =1 ;
-    int norb =12 ;
-    int nalpha = norb/2;
-    int nbeta = norb/2;
+   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   const int norb = hubbard.getNumOrbitals();
+   int nalpha = hubbard.getNumAlphaElectrons();
+   int nbeta = hubbard.getNumBetaElectrons();
+   int nirreps = hubbard.getNumIrreps() ;
 
     auto& dDa = this->template gettmp<SymmetryBlockedTensor<T>>("dDa");
     auto& dDb = this->template gettmp<SymmetryBlockedTensor<T>>("dDb");
@@ -525,8 +511,6 @@ void uhf_modelh<T>::buildFock()
 
     read_2e_integrals();
 
-//    vector<T> v_onsite = {8.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0} ;
-
     for (int i = 0;i < nirrep;i++)
     {
         vector<int> irreps(2,i);
@@ -562,7 +546,7 @@ void uhf_modelh<T>::buildFock()
        for (int k = 0;k < norb;k++)
        {
         focka[i][k+k*norb] += densa[i][k+k*norb]*v_onsite[k];
-        fockb[i][k+k*norb]  = focka[i][k+k*norb];
+        fockb[i][k+k*norb] += densb[i][k+k*norb]*v_onsite[k];
        }
 
         if (Da.norm(2) > 1e-10)

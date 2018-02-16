@@ -11,99 +11,29 @@ namespace aquarius
 namespace hubbard
 {
 
-template <typename U>
-Hubbard<U>::Hubbard(const string& name, input::Config& config):Task(name, config)
+HubbardTask::HubbardTask(const string& name, input::Config& config)
+: Task(name, config)
 {
-    vector<Requirement> reqs;
-    addProduct("Da", "Da", reqs);
-    addProduct("Db", "Db", reqs);
-    addProduct("hubbard_1eints", "H", reqs);
-//    addProduct("hubbard_2eints", "HH2b", reqs);
-    addProduct("hubbard_S", "S", reqs);
+    addProduct(Product("hubbard", "hubbard"));
+}
 
+bool HubbardTask::run(task::TaskDAG& dag, const Arena& arena)
+{
+    put("hubbard", new Hubbard<double>::Hubbard("hubbard", config));
+}
+
+template <typename U>
+Hubbard<U>::Hubbard(const string& name,input::Config& config)
+{
    nelec = config.get<int>("num_electrons");
    norb = config.get<int>("num_orbitals");
    radius = config.get<double>("radius");
    multiplicity = config.get<int>("multiplicity") ;
-   int d = config.get<int>("dimension");
-   nocc = nelec/2;
-   assert(0 < nocc && nocc <= norb);
-}
-
-template <typename U>
-bool Hubbard<U>::run(TaskDAG& dag, const Arena& arena)
-{
-
-    vector<vector<U>> E(norb,vector<U>(norb));
-
-    int nvrt = norb-nocc;
-
-    read_dia_integrals() ; 
-    read_offdia_integrals() ; 
-    read_2e_integrals() ; 
-
-   /*In the following we define the one-electronic AO/site integrals for Hubbard model..
-    */ 
-
-    for (int i = 0;i < norb;i++)
-    {
-       E[i][i] = integral_diagonal[i] ;
-    }
-
-    for (int j = 1;j < norb;j++)
-    {
-       E[0][j] = integral_offdiagonal[j-1] ;
-    }
-
-    for (int i = 1;i < norb;i++)
-    {
-       E[i][0] = integral_offdiagonal[i-1] ;
-    }
-
-    auto& H = this->put("H", new SymmetryBlockedTensor<U>("Fa", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
-//  auto& Fb = this->put("Fb", new SymmetryBlockedTensor<U>("Fb", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
-    auto& Da = this->put("Da", new SymmetryBlockedTensor<U>("Da", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
-    auto& Db = this->put("Db", new SymmetryBlockedTensor<U>("Db", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
-    auto& S  = this->put("S", new SymmetryBlockedTensor<U>("S", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
-
-    vector<tkv_pair<U>> dpairs;
-    vector<tkv_pair<U>> fpairs;
-    vector<tkv_pair<U>> ov_pairs;
-
-    for (int i = 0;i < norb;i++)
-    {
-        ov_pairs.emplace_back(i*norb+i, 1);
-    }
-
-    for (int i = 0;i < nocc;i++)
-    {
-        dpairs.emplace_back(i*norb+i, 1);
-    }
-    for (int i = 0;i < norb;i++)
-    {
-      for (int j = 0;j < norb;j++)
-       {
-        fpairs.emplace_back(i*norb+j, E[i][j]);
-       }
-    }
-
-    if (arena.rank == 0)
-    {
-        Da.writeRemoteData({0,0}, dpairs);
-        H.writeRemoteData({0,0}, fpairs);
-        S.writeRemoteData({0,0}, ov_pairs);
-    }
-    else
-    {
-        Da.writeRemoteData({0,0});
-        H.writeRemoteData({0,0});
-        S.writeRemoteData({0,0}, ov_pairs);
-    }
-
-    Db = Da;
-//    Fb = Fa;
-
-    return true;
+   dimension = config.get<int>("dimension");
+   nalpha = getNumAlphaElectrons() ;
+   nbeta = getNumBetaElectrons() ;
+   assert(0 < nalpha && nalpha <= norb);
+   assert(0 < nbeta && nbeta <= norb);
 }
 
 }
@@ -120,5 +50,5 @@ multiplicity?
 
 )!";
 
-INSTANTIATE_SPECIALIZATIONS(aquarius::hubbard::Hubbard);
-REGISTER_TASK(aquarius::hubbard::Hubbard<double>,"hubbard",spec);
+//INSTANTIATE_SPECIALIZATIONS(aquarius::hubbard::Hubbard);
+REGISTER_TASK(aquarius::hubbard::HubbardTask,"hubbard",spec);

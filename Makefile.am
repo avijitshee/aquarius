@@ -92,6 +92,7 @@ __top_builddir__bin_aquarius_SOURCES = \
 	\
 	src/jellium/jellium.cxx \
 	src/hubbard/hubbard.cxx \
+	src/hubbard/read_integrals.cxx \
 	src/hubbard/uhf_modelH.cxx \
 	src/hubbard/hubbard_aomoints.cxx \
 	src/hubbard/hubbard_moints.cxx \
