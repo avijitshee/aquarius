@@ -81,14 +81,15 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             CU value ;
             CU value1 ;
 
+            int maxspin = (nI == ni) ? 1 : 2 ;
+
             auto& T = this->template get<ExcitationOperator  <U,2>>("T");
             auto& L = this->template get<DeexcitationOperator<U,2>>("L");
-
 
            /* vector LL means Left Lanczos and RL means Right Lanczos
             */
 
-            auto& gf_ip = this-> put("gf_ip", new vector<vector<vector<CU>>>) ;
+            auto& gf_ip = this-> put("gf_ip", new vector<vector<vector<vector<CU>>>>) ;
             
             SpinorbitalTensor<U> Dij("D(ij)", arena, group, {vrt,occ}, {0,1}, {0,1});
             SpinorbitalTensor<U> Gijak("G(ij,ak)", arena, group, {vrt,occ}, {0,2}, {1,1});
@@ -103,42 +104,62 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
            if (orb_range == "full") 
            { orbstart = 0 ;
              orbend = nI + nA ;  
-             gf_ip.resize(omegas.size());
-             for (int i = 0;i < omegas.size();i++)
+             gf_ip.resize(maxspin);
+
+            for (int nspin = 0;nspin < maxspin;nspin++)
              {
-               gf_ip[i].resize(orbend);
+              gf_ip[nspin].resize(omegas.size());
+             }  
+
+            for (int nspin = 0;nspin < maxspin;nspin++)
+             {
+              for (int i = 0;i < omegas.size();i++)
+               {
+                gf_ip[nspin][i].resize(orbend);
+               }
              }
+             for (int nspin = 0;nspin < maxspin;nspin++)
              for (int i = 0;i < omegas.size();i++)
              for (int j = 0;j < orbend;j++)
              {
-               gf_ip[i][j].resize(orbend);
+               gf_ip[nspin][i][j].resize(orbend);
              }
            } 
 
            if (orb_range == "diagonal") 
            { orbstart = orbital-1 ;
              orbend = orbital;  
-             gf_ip.resize(omegas.size());
-             for (int i = 0;i < omegas.size();i++)
+             gf_ip.resize(maxspin);
+            for (int nspin = 0;nspin < maxspin;nspin++)
              {
-               gf_ip[i].resize(1);
+              gf_ip[nspin].resize(omegas.size());
+             }  
+            for (int nspin = 0;nspin < maxspin;nspin++)
+             {
+              for (int i = 0;i < omegas.size();i++)
+               {
+                gf_ip[nspin][i].resize(1);
+               }
              }
+             for (int nspin = 0;nspin < maxspin;nspin++)
              for (int i = 0;i < omegas.size();i++)
-             for (int j = 0;j < 1;j++)
+             for (int j = 0;j < orbend;j++)
              {
-               gf_ip[i][j].resize(1);
+               gf_ip[nspin][i][j].resize(1);
              }
            } 
 
           vector<CU> spec_func(omegas.size()) ;
 
-          for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   
+        for (int nspin = 0; nspin < maxspin ; nspin++)   
+         {
+         for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   
           {
            for (int orbright = orbstart; orbright < orbend ; orbright++)   
             {
               old_value.clear() ;             
 
-             printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
+            printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
 
             bool isalpha_right = false;
             bool isvrt_right = false;
@@ -148,7 +169,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             int orbleft_dummy = orbleft ;
             int orbright_dummy = orbright ;
 
-            if ((orbleft+1) > 0)
+            if (nspin == 0)
             {
                 isalpha_left = true;
                 if ((orbleft ) >= nI)
@@ -159,15 +180,14 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             }
             else
             {
-                orbleft = -orbital-2;
                 if (orbleft >= ni)
                 {
                     isvrt_left = true;
-                    orbleft -= ni;
+                    orbleft_dummy = orbleft - ni;
                 }
             }
 
-            if ((orbright+1) > 0)
+            if (nspin == 0)
             {
                 isalpha_right = true;
                 if ((orbright ) >= nI)
@@ -178,11 +198,10 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             }
             else
             {
-                orbright = -orbital-2;
                 if (orbright >= ni)
                 {
                     isvrt_right = true;
-                    orbright -= ni;
+                    orbright_dummy = orbright - ni;
                 }
             }
 
@@ -202,20 +221,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             SpinorbitalTensor<U> ap ("ap"  , arena, group, {vrt,occ}, {0,0}, {isvrt_right, !isvrt_right}, isalpha_right ? -1 : 1);
             SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {isvrt_left, !isvrt_left}, {0,0}, isalpha_left ? 1 : -1);
 
-          vector<tkv_pair<U>> pair_left{{orbleft_dummy, 1}};
-//          vector<tkv_pair<U>> pair_left{{orbright_dummy, 1}};
-          vector<tkv_pair<U>> pair_right{{orbright_dummy, 1}};
-//          vector<tkv_pair<U>> pair_right{{orbleft_dummy, 1}};
-
-
-//        vector<tkv_pair<U>> pair_left;
-//        vector<tkv_pair<U>> pair_right;
-
-//        pair_left.push_back(tkv_pair<double>(orbleft_dummy,1)) ;
-//        pair_left.push_back(tkv_pair<double>(orbright_dummy,1)) ;
-
-//        pair_right.push_back(tkv_pair<double>(orbleft_dummy,1)) ;
-//        pair_right.push_back(tkv_pair<double>(orbright_dummy,1)) ;
+            vector<tkv_pair<U>> pair_left{{orbleft_dummy, 1}};
+            vector<tkv_pair<U>> pair_right{{orbright_dummy, 1}};
 
             CTFTensor<U>& tensor1 = ap({0,0}, {isvrt_right && isalpha_right, !isvrt_right && isalpha_right})({0});
             if (arena.rank == 0)
@@ -236,6 +243,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                  * b  (e) = t
                  *  ijk...   ijk...
                  */
+
                 b(1)[  "i"] = T(1)[  "ei"]*ap["e"];
                 b(2)["aij"] = T(2)["aeij"]*ap["e"];
 
@@ -244,8 +252,18 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                  * e  (e) = l
                  *  ab...    abe...
                  */
+
                 e(1)[  "i"] = L(1)[  "ie"]*apt["e"];
                 e(2)["ija"] = L(2)["ijae"]*apt["e"];
+
+                if (orbright != orbleft)
+                {
+                 b(1)[  "i"] += T(1)[  "ei"]*apt["e"];
+                 b(2)["aij"] += T(2)["aeij"]*apt["e"];
+
+                 e(1)[  "i"] += L(1)[  "ie"]*ap["e"];
+                 e(2)["ija"] += L(2)["ijae"]*ap["e"];
+                }
             }
             else if((isvrt_right) && (!isvrt_left))
             {
@@ -255,7 +273,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                  *  q
                  *  ijk...   ijk...
                  */
-                b(1)[  "i"] = T(1)[  "ei"]*ap["e"];
+                b(1)[  "i"]  = apt["i"]; //new
+                b(1)[  "i"] += T(1)[  "ei"]*ap["e"];
                 b(2)["aij"] = T(2)["aeij"]*ap["e"];
 
                 /*
@@ -268,6 +287,10 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                 e(1)[  "i"] -=   Dij[  "im"]*apt["m"];
                 e(2)["ija"]  =  L(1)[  "ia"]*apt["j"];
                 e(2)["ija"] -= Gijak["ijam"]*apt["m"];
+
+                e(1)[  "i"] += L(1)[  "ie"]*ap["e"];  //new
+                e(2)["ija"] += L(2)["ijae"]*ap["e"];   //new
+
             }
             else if((!isvrt_right) && (isvrt_left))
             {
@@ -276,18 +299,24 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                  *  i       im
                  */
                 b(1)["i"] = ap["i"];
+                b(1)[  "i"] += T(1)[  "ei"]*apt["e"]; //new
+                b(2)["aij"] = T(2)["aeij"]*apt["e"];  //new
                 /*
                  *  ijk...   ijk...
                  * e  (e) = l
                  *  ab...    abe...
                  */
-                e(1)[  "i"] = L(1)[  "ie"]*apt["e"];
+                e(1)[  "i"] =               ap["i"];
+                e(1)[  "i"] += L(1)[  "ie"]*apt["e"];
                 e(2)["ija"] = L(2)["ijae"]*apt["e"];
+
+                e(1)[  "i"] -=   Dij[  "im"]*ap["m"];
+                e(2)["ija"] +=  L(1)[  "ia"]*ap["j"];
+                e(2)["ija"] -= Gijak["ijam"]*ap["m"];
 
             } 
             else
             {
-              printf("I should be here inside the dressing of creation op: %10f\n", 10.5);
                 /*
                  * b (m) = d
                  *  i       im
@@ -299,12 +328,33 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                  * e  (m) = d  (1 + l     ) + G
                  *  ab...    km      ab...     abm...
                  */
-                e(1)[  "i"]  =               apt["i"];
+                e(1)[  "i"]   =               apt["i"];
 
                 e(1)[  "i"] -=   Dij[  "im"]*apt["m"];
                 e(2)["ija"]  =  L(1)[  "ia"]*apt["j"];
                 e(2)["ija"] -= Gijak["ijam"]*apt["m"];
+
+              if (orbright != orbleft)
+              {
+                b(1)["i"] += apt["i"];  //new
+                e(1)[  "i"]  +=               ap["i"]; //extra
+                e(1)[  "i"] -=   Dij[  "im"]*ap["m"];  //extra
+                e(2)["ija"]  +=  L(1)[  "ia"]*ap["j"]; //extra
+                e(2)["ija"] -= Gijak["ijam"]*ap["m"]; //extra
+              }
             }
+
+
+
+
+
+
+
+
+
+
+
+
 
             //printf("<E|E>: %.15f\n", scalar(e*e));
             //printf("<B|B>: %.15f\n", scalar(b*b));
@@ -343,8 +393,10 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 //              printf("print norm: %10f\n", norm);
               Nij["ij"] = e(1)[  "i"]*b(1)[  "j"]  ;
               Nij["ij"] -= e(2)["ime"]*b(2)["ejm"];
-             
+
               Iterative<U>::run(dag, arena);
+
+              printf("print norm debug: %10f\n", norm);
 
               nvec_lanczos = alpha.size() ; 
 
@@ -396,7 +448,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               CU gamma_temp ;
               CU com_one(1.,0.) ;
               omega = {o.real(),o.imag()} ;
-//             omega = {-o.real(),o.imag()} ;
+//            omega = {-o.real(),o.imag()} ;
 
              this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
 
@@ -412,10 +464,10 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               value1 = value ;
              }
 
-            if(orbright==orbleft) spec_func[omega_counter] += value*norm*norm;
+             if(orbright==orbleft) spec_func[omega_counter] += value*norm*norm;
 
-             if (orb_range == "full") gf_ip[omega_counter][orbleft][orbright] = value*norm*norm ;
-             if (orb_range == "diagonal") gf_ip[omega_counter][0][0] = value*norm*norm ;
+             if (orb_range == "full") gf_ip[nspin][omega_counter][orbleft][orbright] = value*norm*norm ;
+             if (orb_range == "diagonal") gf_ip[nspin][omega_counter][0][0] = value*norm*norm ;
 
     //       std::ofstream gomega;
     //         gomega.open ("gomega.dat", ofstream::out|std::ios::app);
@@ -429,6 +481,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              }
           }
         }
+       }
              U piinverse = 1/M_PI ;
              std::ofstream gomega;
                gomega.open ("gomega_ip.dat", ofstream::out|std::ios::app);
@@ -458,20 +511,19 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
             auto& XE = this->template gettmp<SpinorbitalTensor<U>>("XE");
             auto& XEA = this->template gettmp<SpinorbitalTensor<U>>("XEA");
-
             auto& D = this->template gettmp<Denominator<U>>("D");
             auto& lanczos = this->template gettmp<Lanczos<U,X>>("lanczos");
-
             auto& RL = this->template gettmp< ExcitationOperator<U,1,2>>("RL");
             auto& LL = this->template gettmp< DeexcitationOperator<U,1,2>>("LL");
             auto& Z  = this->template gettmp<  ExcitationOperator<U,1,2>>("Z");
             auto& Y  = this->template gettmp<  DeexcitationOperator<U,1,2>>("Y");
             auto& b  = this->template gettmp<  ExcitationOperator<U,1,2>>("b");
             auto& e  = this->template gettmp<DeexcitationOperator<U,1,2>>("e");
-
             auto& alpha = this->template gettmp<unique_vector<U>> ("alpha");
             auto& beta  = this->template gettmp<unique_vector<U>> ("beta");
             auto& gamma = this->template gettmp<unique_vector<U>> ("gamma");
+
+            printf("debug 8: %.10f\n", 10.5);
 
             int nvec_lanczos; 
             U value ;

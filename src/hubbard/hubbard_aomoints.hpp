@@ -21,23 +21,17 @@ class Hubbard_AOMOints : public Hubbard_MOIntegrals<T>
     protected:
         vector<T> v_onsite ;
         bool run(task::TaskDAG& dag, const Arena& arena);
-        void writeIntegrals(bool pvirt, bool qvirt, bool rvirt, bool svirt,
-                                vector<T>& cfirst, vector<T>& csecond, vector<T>& cthird, vector<T>& cfourth,
-                                tensor::SymmetryBlockedTensor<T>& tensor) ;
+        void writeIntegrals(vector<T>& cfirst, vector<T>& csecond, vector<T>& cthird, vector<T>& cfourth,
+                                tensor::SymmetryBlockedTensor<T>& tensor, int np, int nq, int nr, int ns) ;
         void read_2e_integrals()
         {
           std::ifstream onsite("onsite.txt");
           std::istream_iterator<T> start(onsite), end;
           std::vector<T> int_onsite(start, end);
-          std::cout << "Read " << int_onsite.size() << " numbers" << std::endl;
+          std::copy(int_onsite.begin(), int_onsite.end(), std::back_inserter(v_onsite)) ;
+        }
 
-  // print the numbers to stdout
-         std::cout << "numbers read in:\n";
-         std::copy(int_onsite.begin(), int_onsite.end(), 
-         std::ostream_iterator<double>(std::cout, " "));
-         std::cout << std::endl;
-         v_onsite.insert(v_onsite.begin(),int_onsite.begin(),int_onsite.end());  
-       }
+
 };
 
 }

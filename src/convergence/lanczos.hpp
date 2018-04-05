@@ -110,17 +110,17 @@ class Lanczos : public task::Destructible
             /*do some printing
              */   
             
-             vector<U> temp1;
-             vector<U> temp2;
-             vector<U> temp3;
+//           vector<U> temp1;
+//           vector<U> temp2;
+//           vector<U> temp3;
 
-             temp1.clear() ;
-             temp2.clear() ;
-             temp3.clear() ;
+//           temp1.clear() ;
+//           temp2.clear() ;
+//           temp3.clear() ;
 
-             hc_r(1)({0,0},{0,1})({0}).getAllData(temp1);
-             hc_r(2)({0,0},{0,1})({0,0,0}).getAllData(temp2);
-             hc_r(2)({1,0},{0,2})({0,0,0}).getAllData(temp3);
+//           hc_r(1)({0,0},{0,1})({0}).getAllData(temp1);
+//           hc_r(2)({0,0},{0,1})({0,0,0}).getAllData(temp2);
+//           hc_r(2)({1,0},{0,2})({0,0,0}).getAllData(temp3);
 
 //          for (int ii = 0 ; ii< temp1.size(); ii++){
 //           printf("print values of c_r(1) : %.10f \n",temp1[ii]);
@@ -211,17 +211,17 @@ class Lanczos : public task::Destructible
             /*do some printing
              */   
             
-             vector<U> temp1;
-             vector<U> temp2;
-             vector<U> temp3;
+//           vector<U> temp1;
+//           vector<U> temp2;
+//           vector<U> temp3;
 
-             temp1.clear() ;
-             temp2.clear() ;
-             temp3.clear() ;
+//           temp1.clear() ;
+//           temp2.clear() ;
+//           temp3.clear() ;
 
-             hc_r(1)({1,0},{0,0})({0}).getAllData(temp1);
-             hc_r(2)({1,0},{0,0})({0,0,0}).getAllData(temp2);
-             hc_r(2)({2,0},{0,1})({0,0,0}).getAllData(temp3);
+//           hc_r(1)({1,0},{0,0})({0}).getAllData(temp1);
+//           hc_r(2)({1,0},{0,0})({0,0,0}).getAllData(temp2);
+//           hc_r(2)({2,0},{0,1})({0,0,0}).getAllData(temp3);
 
 //          for (int ii = 0 ; ii< temp1.size(); ii++){
 //           printf("print values of c_r(1) : %.10f \n",temp1[ii]);

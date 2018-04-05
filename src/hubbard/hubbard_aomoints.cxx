@@ -53,6 +53,8 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     int norb = N[0]; 
     int nocc = nI[0]; 
 
+     printf("Print number of alpha and beta orbitals: %d %d %d\n ",norb, nI[0],ni[0]);
+
     for (int i = 0;i < nirreps;i++)
     {
         vector<int> irreps = {i,i};
@@ -67,8 +69,6 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     }
 
     vector<vector<U>> E(norb,vector<U>(norb));
-
-        int nvrt = norb-nocc;
 
    /*In the following we define the one-electronic AO/site integrals for Hubbard model..
     */ 
@@ -102,62 +102,121 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     }
     }
 
-
-
     /*
      * <ab||ij>
      */
-    writeIntegrals(true, true, false, false,cA[0],ca[0],cI[0],ci[0],H.getABIJ()({1,0},{0,1}));
-//    writeIntegrals(true, true, false, false,cAtrans,catrans,cItrans,citrans,H.getABIJ()({1,0},{0,1}));
-    H.getABIJ()({2,0},{0,2})["ABIJ"]  = 0.5*H.getABIJ()({1,0},{0,1})["ABIJ"];
-    H.getABIJ()({0,0},{0,0})["abij"]  = 0.5*H.getABIJ()({1,0},{0,1})["abij"];
+     writeIntegrals(cA[0],ca[0],cI[0],ci[0],H.getABIJ()({1,0},{0,1}),nA[0],na[0],nI[0],ni[0]);
+     writeIntegrals(cA[0],cA[0],cI[0],cI[0],H.getABIJ()({2,0},{0,2}),nA[0],nA[0],nI[0],nI[0]);
+     writeIntegrals(ca[0],ca[0],ci[0],ci[0],H.getABIJ()({0,0},{0,0}),na[0],na[0],ni[0],ni[0]);
+
+     H.getABIJ()({2,0},{0,2})["ABIJ"]  = 0.5*H.getABIJ()({2,0},{0,2})["ABIJ"];
+     H.getABIJ()({0,0},{0,0})["abij"]  = 0.5*H.getABIJ()({0,0},{0,0})["abij"];
+
     /*
      * <ab||ci>
      */
-    writeIntegrals(true, true, true, false,cA[0],ca[0],cA[0],ci[0],H.getABCI()({1,0},{1,0}));
- //   writeIntegrals(true, true, true, false,cAtrans,catrans,cAtrans,citrans,H.getABCI()({1,0},{1,0}));
-    H.getABCI()({2,0},{1,1})["ABCI"]  =     H.getABCI()({1,0},{1,0})["ABCI"];
-    H.getABCI()({1,0},{0,1})["AbcI"]  =    -H.getABCI()({1,0},{1,0})["bAcI"];
-    H.getABCI()({0,0},{0,0})["abci"]  =     H.getABCI()({1,0},{1,0})["abci"];
+    writeIntegrals(cA[0],ca[0],cA[0],ci[0],H.getABCI()({1,0},{1,0}),nA[0],na[0],nA[0],ni[0]);
+    writeIntegrals(cA[0],cA[0],cA[0],cI[0],H.getABCI()({2,0},{1,1}),nA[0],nA[0],nA[0],nI[0]);
+    writeIntegrals(ca[0],ca[0],ca[0],ci[0],H.getABCI()({0,0},{0,0}),na[0],na[0],na[0],ni[0]);
+    writeIntegrals(ca[0],cA[0],ca[0],cI[0],H.getABCI()({1,0},{0,1}),na[0],nA[0],na[0],nI[0]);
+
+//    H.getABCI()({2,0},{1,1})["ABCI"]  =     H.getABCI()({1,0},{1,0})["ABCI"];
+//    H.getABCI()({0,0},{0,0})["abci"]  =     H.getABCI()({1,0},{1,0})["abci"];
+//    H.getABCI()({1,0},{0,1})["AbcI"]  =    -H.getABCI()({1,0},{1,0})["bAcI"];
+
+      H.getABCI()({1,0},{0,1})["AbcI"]  =    -H.getABCI()({1,0},{0,1})["AbcI"];
 
     /*
      * <ai||jk>
      */
-    writeIntegrals(true, false, false, false,cA[0],ci[0],cI[0],ci[0],H.getAIJK()({1,0},{0,1}));
- //   writeIntegrals(true, false, false, false,cAtrans,citrans,cItrans,citrans,H.getAIJK()({1,0},{0,1}));
-    SymmetryBlockedTensor<U> tmp(H.getAIJK()({1,0},{0,1}));
-    H.getAIJK()({1,1},{0,2})["AIJK"]  =     H.getAIJK()({1,0},{0,1})["AIJK"];
-    H.getAIJK()({0,1},{0,1})["aIJk"]  =    -H.getAIJK()({1,0},{0,1})["aIkJ"];
-    H.getAIJK()({0,0},{0,0})["aijk"]  =     H.getAIJK()({1,0},{0,1})["aijk"];
+    writeIntegrals(cA[0],ci[0],cI[0],ci[0],H.getAIJK()({1,0},{0,1}),nA[0],ni[0],nI[0],ni[0]);
+
+    writeIntegrals(cA[0],cI[0],cI[0],cI[0],H.getAIJK()({1,1},{0,2}),nA[0],nI[0],nI[0],nI[0]);
+    writeIntegrals(ca[0],cI[0],ci[0],cI[0],H.getAIJK()({0,1},{0,1}),na[0],nI[0],ni[0],nI[0]);
+    writeIntegrals(ca[0],ci[0],ci[0],ci[0],H.getAIJK()({0,0},{0,0}),na[0],ni[0],ni[0],ni[0]);
+
+// H.getAIJK()({1,1},{0,2})["AIJK"]  =     H.getAIJK()({1,0},{0,1})["AIJK"];
+// H.getAIJK()({0,1},{0,1})["aIJk"]  =    -H.getAIJK()({1,0},{0,1})["aIkJ"];
+// H.getAIJK()({0,0},{0,0})["aijk"]  =     H.getAIJK()({1,0},{0,1})["aijk"];
+
+   H.getAIJK()({0,1},{0,1})["aIJk"]  =    -H.getAIJK()({0,1},{0,1})["aIJk"];
 
     /*
      * <ij||kl>
      */
-    writeIntegrals(false, false, false, false,cI[0],ci[0],cI[0],ci[0],H.getIJKL()({0,1},{0,1}));
-//    writeIntegrals(false, false, false, false,cItrans,citrans,cItrans,citrans,H.getIJKL()({0,1},{0,1}));
-    H.getIJKL()({0,2},{0,2})["IJKL"]  = 0.25*H.getIJKL()({0,1},{0,1})["IJKL"];
-    H.getIJKL()({0,0},{0,0})["ijkl"]  = 0.25*H.getIJKL()({0,1},{0,1})["ijkl"];
+    writeIntegrals(cI[0],ci[0],cI[0],ci[0],H.getIJKL()({0,1},{0,1}),nI[0],ni[0],nI[0],ni[0]);
+    writeIntegrals(cI[0],cI[0],cI[0],cI[0],H.getIJKL()({0,2},{0,2}),nI[0],nI[0],nI[0],nI[0]);
+    writeIntegrals(ci[0],ci[0],ci[0],ci[0],H.getIJKL()({0,0},{0,0}),ni[0],ni[0],ni[0],ni[0]);
+
+    H.getIJKL()({0,2},{0,2})["IJKL"]  = 0.25*H.getIJKL()({0,2},{0,2})["IJKL"];
+    H.getIJKL()({0,0},{0,0})["ijkl"]  = 0.25*H.getIJKL()({0,0},{0,0})["ijkl"];
 
     /*
      * <ab||cd>
      */
-    writeIntegrals(true, true, true, true,cA[0],ca[0],cA[0],ca[0],H.getABCD()({1,0},{1,0}));
- // writeIntegrals(true, true, true, true,cAtrans,catrans,cAtrans,catrans,H.getABCD()({1,0},{1,0}));
-    H.getABCD()({2,0},{2,0})["ABCD"]  = 0.25*H.getABCD()({1,0},{1,0})["ABCD"];
-    H.getABCD()({0,0},{0,0})["abcd"]  = 0.25*H.getABCD()({1,0},{1,0})["abcd"];
+    writeIntegrals(cA[0],ca[0],cA[0],ca[0],H.getABCD()({1,0},{1,0}),nA[0],na[0],nA[0],na[0]);
+    writeIntegrals(cA[0],cA[0],cA[0],cA[0],H.getABCD()({2,0},{2,0}),nA[0],nA[0],nA[0],nA[0]);
+    writeIntegrals(ca[0],ca[0],ca[0],ca[0],H.getABCD()({0,0},{0,0}),na[0],na[0],na[0],na[0]);
+
+    H.getABCD()({2,0},{2,0})["ABCD"]  = 0.25*H.getABCD()({2,0},{2,0})["ABCD"];
+    H.getABCD()({0,0},{0,0})["abcd"]  = 0.25*H.getABCD()({0,0},{0,0})["abcd"];
 
     /*
      * <ai||bj>
      */
-    writeIntegrals(true, false, true, false,cA[0],ci[0],cA[0],ci[0],H.getAIBJ()({1,0},{1,0}));
 
-    H.getAIBJ()({1,1},{1,1})["AIBJ"]  =     H.getAIBJ()({1,0},{1,0})["AIBJ"];
-    H.getAIBJ()({1,1},{1,1})["AIBJ"] -=     H.getABIJ()({1,0},{0,1})["ABJI"];
-    H.getAIBJ()({0,1},{0,1})["aIbJ"]  =     H.getAIBJ()({1,0},{1,0})["aIbJ"];
-    H.getAIBJ()({1,0},{0,1})["AibJ"]  =    -H.getABIJ()({1,0},{0,1})["AbJi"];
-    H.getAIBJ()({0,1},{1,0})["aIBj"]  =    -H.getABIJ()({1,0},{0,1})["aBjI"];
-    H.getAIBJ()({0,0},{0,0})["aibj"]  =     H.getAIBJ()({1,0},{1,0})["aibj"];
-    H.getAIBJ()({0,0},{0,0})["aibj"] -=     H.getABIJ()({1,0},{0,1})["abji"];
+  SymmetryBlockedTensor<U> aijb("aijb", arena, PointGroup::C1(), 4, {{na[0]},{ni[0]},{ni[0]},{na[0]}}, {NS,NS,NS,NS}, false);
+  SymmetryBlockedTensor<U> AIJB("AIJB", arena, PointGroup::C1(), 4, {{nA[0]},{nI[0]},{nI[0]},{nA[0]}}, {NS,NS,NS,NS}, false);
+  SymmetryBlockedTensor<U> AiJb("AiJb", arena, PointGroup::C1(), 4, {{nA[0]},{ni[0]},{nI[0]},{na[0]}}, {NS,NS,NS,NS}, false);
+  SymmetryBlockedTensor<U> aIjB("aIjB", arena, PointGroup::C1(), 4, {{na[0]},{nI[0]},{ni[0]},{nA[0]}}, {NS,NS,NS,NS}, false);
+
+  SymmetryBlockedTensor<U> ABIJ("ABIJ", arena, PointGroup::C1(), 4, {{nA[0]},{nA[0]},{nI[0]},{nI[0]}}, {NS,NS,NS,NS}, false);
+  SymmetryBlockedTensor<U> abij("abij", arena, PointGroup::C1(), 4, {{na[0]},{na[0]},{ni[0]},{ni[0]}}, {NS,NS,NS,NS}, false);
+
+//  writeIntegrals(true, false, false, true, aijb);
+//  writeIntegrals(true, false, false, true, aijb);
+  writeIntegrals(ca[0],ci[0],ci[0],ca[0],aijb,na[0],ni[0],ni[0],na[0]);
+  writeIntegrals(cA[0],cI[0],cI[0],cA[0],AIJB,nA[0],nI[0],nI[0],nA[0]);
+  writeIntegrals(cA[0],ci[0],cI[0],ca[0],AiJb,nA[0],ni[0],nI[0],na[0]);
+  writeIntegrals(ca[0],cI[0],ci[0],cA[0],aIjB,na[0],nI[0],ni[0],nA[0]);
+
+  writeIntegrals(ca[0],ca[0],ci[0],ci[0],abij,na[0],na[0],ni[0],ni[0]);
+  writeIntegrals(cA[0],cA[0],cI[0],cI[0],ABIJ,nA[0],nA[0],nI[0],nI[0]);
+
+  writeIntegrals(cA[0],ci[0],cA[0],ci[0],H.getAIBJ()({1,0},{1,0}),nA[0],ni[0],nA[0],ni[0]);
+
+  writeIntegrals(cA[0],cI[0],cA[0],cI[0],H.getAIBJ()({1,1},{1,1}),nA[0],nI[0],nA[0],nI[0]);
+  writeIntegrals(ca[0],cI[0],ca[0],cI[0],H.getAIBJ()({0,1},{0,1}),na[0],nI[0],na[0],nI[0]);
+  writeIntegrals(ca[0],ci[0],ca[0],ci[0],H.getAIBJ()({0,0},{0,0}),na[0],ni[0],na[0],ni[0]);
+
+//  writeIntegrals(cA[0],ci[0],ca[0],cI[0],H.getAIBJ()({1,0},{0,1}),nA[0],ni[0],na[0],nI[0]);
+//  writeIntegrals(ca[0],cI[0],cA[0],ci[0],H.getAIBJ()({0,1},{1,0}),na[0],nI[0],nA[0],ni[0]);
+
+// H.getAIBJ()({1,0},{0,1})["AibJ"]  =    -H.getAIBJ()({1,0},{0,1})["AibJ"];
+// H.getAIBJ()({0,1},{1,0})["aIBj"]  =    -H.getAIBJ()({0,1},{1,0})["aIBj"];
+
+  H.getAIBJ()({1,0},{0,1})["AibJ"]  =   -AiJb["AiJb"];
+  H.getAIBJ()({0,1},{1,0})["aIBj"]  =   -aIjB["aIjB"];
+
+//   H.getAIBJ()({0,0},{0,0})["aibj"] -=   H.getABIJ()({0,0},{0,0})["abji"];
+//   H.getAIBJ()({1,1},{1,1})["AIBJ"] -=   H.getABIJ()({2,0},{0,2})["ABJI"];
+
+// H.getAIBJ()({0,0},{0,0})["aibj"] -= aijb["aijb"]  ;
+// H.getAIBJ()({1,1},{1,1})["AIBJ"] -= AIJB["AIJB"] ;
+
+   H.getAIBJ()({0,0},{0,0})["aibj"] -= abij["abji"]  ;
+   H.getAIBJ()({1,1},{1,1})["AIBJ"] -= ABIJ["ABJI"] ;
+
+// H.getAIBJ()({1,1},{1,1})["AIBJ"]  =     H.getAIBJ()({1,0},{1,0})["AIBJ"];
+// H.getAIBJ()({0,1},{0,1})["aIbJ"]  =     H.getAIBJ()({1,0},{1,0})["aIbJ"];
+// H.getAIBJ()({1,0},{0,1})["AibJ"]  =    -H.getABIJ()({1,0},{0,1})["AbJi"];
+// H.getAIBJ()({0,1},{1,0})["aIBj"]  =    -H.getABIJ()({1,0},{0,1})["aBjI"];
+// H.getAIBJ()({0,0},{0,0})["aibj"]  =     H.getAIBJ()({1,0},{1,0})["aibj"];
+
+// H.getAIBJ()({0,0},{0,0})["aibj"] -=     H.getABIJ()({1,0},{0,1})["abji"];
+// H.getAIBJ()({1,1},{1,1})["AIBJ"] -=     H.getABIJ()({1,0},{0,1})["ABJI"];
+
+    printf("Print number of alpha and final debug: %d %d\n ",nI[0],ni[0]);
 
     /*
      * Fill in pieces which are equal by Hermiticity
@@ -188,20 +247,15 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
 }
 
 template <typename U>
-void Hubbard_AOMOints<U>::writeIntegrals(bool pvirt, bool qvirt, bool rvirt, bool svirt,
-                                vector<U>& cfirst, vector<U>& csecond, vector<U>& cthird, vector<U>& cfourth,
-                                SymmetryBlockedTensor<U>& tensor)
+void Hubbard_AOMOints<U>::writeIntegrals(vector<U>& cfirst, vector<U>& csecond, vector<U>& cthird, vector<U>& cfourth,
+                                SymmetryBlockedTensor<U>& tensor, int np, int nq, int nr, int ns)
 {
     vector<tkv_pair<U>> pairs;
     tensor.getLocalData({0,0,0,0}, pairs);
 
     int norb = 12;
-    int nocc = 6 ;
 
-    int np = (pvirt ? norb-nocc : nocc);
-    int nq = (qvirt ? norb-nocc : nocc);
-    int nr = (rvirt ? norb-nocc : nocc);
-    int ns = (svirt ? norb-nocc : nocc);
+    read_2e_integrals() ; 
 
    /* H(Pjkl) = V(ijkl)*C(Pi)
     */
@@ -209,8 +263,6 @@ void Hubbard_AOMOints<U>::writeIntegrals(bool pvirt, bool qvirt, bool rvirt, boo
 //   vector<U> buf1(np*nq,0.0) ;
 //   vector<U> buf2(nr*ns,0.0) ;
 //   vector<U> buf3(np*nq*nr*ns,0.0) ;
-
-    read_2e_integrals() ; 
 
 //     vector<double> v_onsite = {8.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000};   
 
@@ -227,14 +279,14 @@ void Hubbard_AOMOints<U>::writeIntegrals(bool pvirt, bool qvirt, bool rvirt, boo
     k = 0 ;
     double value ;
 
-   for (int s = 0; s < ns ; s++)
-   {
-   for (int r = 0; r < nr ; r++)
-   {
+ for (int s = 0; s < ns ; s++)
+ {
+  for (int r = 0; r < nr ; r++)
+  {
    for (int q = 0; q < nq ; q++)
    {
-   for (int p = 0; p < np ; p++)
-   {
+    for (int p = 0; p < np ; p++)
+     {
         value = 0.0 ; 
         for (int i = 0; i < norb ; i++)
         {
@@ -242,12 +294,10 @@ void Hubbard_AOMOints<U>::writeIntegrals(bool pvirt, bool qvirt, bool rvirt, boo
         }   
         pairs.emplace_back(k,value) ;
         k += 1 ;
+    }   
    }   
-   }   
-   }   
-   }   
-
-//    printf("I came here: %.15f\n", buf3[1]);
+  }   
+ }   
 
     tensor.writeRemoteData({0,0,0,0}, pairs);
 }
