@@ -6,6 +6,7 @@
 #include "util/iterative.hpp"
 #include "operator/2eoperator.hpp"
 #include "operator/st2eoperator.hpp"
+#include "operator/space.hpp"
 #include "operator/excitationoperator.hpp"
 #include "operator/deexcitationoperator.hpp"
 #include "operator/denominator.hpp"
@@ -34,9 +35,12 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
         int orbital;
         int orbstart;
         int orbend;
+        int nr_impurities; 
         vector<CU> omegas;
         CU omega;
         vector<U> old_value ;
+        vector<U> integral_diagonal ;
+        vector<U> v_onsite ;
         string orb_range ;
 
     public:
@@ -47,9 +51,9 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             reqs.emplace_back("ccsd.T", "T");
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
+            reqs.emplace_back("ccsd.ipgflanczos", "gf_ip");
             reqs.emplace_back("occspace", "occ");
             reqs.emplace_back("vrtspace", "vrt");
-            reqs.emplace_back("ccsd.ipgflanczos", "gf_ip");
             reqs.emplace_back("Ea", "Ea");
             reqs.emplace_back("Eb", "Eb");
             this->addProduct(Product("ccsd.eagflanczos", "gf_ea", reqs));
@@ -57,7 +61,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             orbital = config.get<int>("orbital");
             double from = config.get<double>("omega_min");
             double to = config.get<double>("omega_max");
-            int n = config.get<double>("npoint");
+            int n = config.get<int>("npoint");
+            nr_impurities = config.get<int>("impurities"); 
             double eta = config.get<double>("eta");
             double beta = config.get<double>("beta");
             string grid_type = config.get<string>("grid");
@@ -97,11 +102,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             const auto& occ_hf = this->template get<MOSpace<U>>("occ");
             const auto& vrt_hf = this->template get<MOSpace<U>>("vrt");
 
-//            auto& Fa = this->template get<SymmetryBlockedTensor<U>>("Fa");
-//            auto& Fb = this->template get<SymmetryBlockedTensor<U>>("Fb");
-
-             auto& Ea = this->template get<vector<vector<real_type_t<U>>>>("Ea");
-             auto& Eb = this->template get<vector<vector<real_type_t<U>>>>("Eb");
+            auto& Ea = this->template get<vector<vector<real_type_t<U>>>>("Ea");
+            auto& Eb = this->template get<vector<vector<real_type_t<U>>>>("Eb");
 
             auto& gf_ea = this-> put("gf_ea", new vector<vector<vector<vector<CU>>>>) ;
 
@@ -169,9 +171,35 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
           vector<CU> spec_func(omegas.size()) ;
 
-          std::ifstream iffile("gomega.dat");
-          if (iffile) remove("gomega.dat");
+    /* remove all self-energy and total Green's function files those are already there in the directory..
+     */  
 
+       for (int nspin = 0; nspin < maxspin ; nspin++)   
+       { 
+        for (int i = 0;i < nr_impurities;i++)
+        { 
+          std::stringstream stream;
+          stream << "gomega_"<<nspin<<"_"<<i<< ".txt";
+          std::string fileName = stream.str();
+          std::ifstream gfile(fileName.c_str());
+          if (gfile) remove(fileName.c_str());
+        } 
+       }
+
+       for (int nspin = 0; nspin < maxspin ; nspin++)   
+       { 
+        for (int i = 0;i < nr_impurities;i++)
+        { 
+          std::stringstream stream;
+          stream << "self_energy_"<<nspin<<"_"<<i<< ".txt";
+          std::string fileName = stream.str();
+          std::ifstream sigmafile(fileName.c_str());
+          if (sigmafile) remove(fileName.c_str());
+        } 
+       }
+
+     /* start calculating all GF elements..
+      */  
 
         for (int nspin = 0; nspin < maxspin ; nspin++)   
          {
@@ -225,7 +253,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                 }
             }
 
-           /* vector LL means Left Lanczos and RL means Right Lanczos
+           /* vector LL means Left Lanczos and RL means Right Lanczos, in case you are wondering!  
             */
             auto& RL = this->puttmp("RL", new ExcitationOperator  <U,2,1>("RL", arena, occ, vrt, isalpha_right ? 1 : -1));
             auto& LL = this->puttmp("LL", new DeexcitationOperator  <U,2,1>("LL", arena, occ, vrt, isalpha_left ? -1 : 1));
@@ -243,16 +271,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             SpinorbitalTensor<U> ap ("ap"  , arena, group, {vrt,occ}, {!isvrt_right, isvrt_right}, {0,0}, isalpha_right ? 1 : -1);
             SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {0,0}, {!isvrt_left, isvrt_left}, isalpha_left ? -1 : 1);
 
-//            vector<tkv_pair<U>> pairs{{orbital, 1}};
-
             vector<tkv_pair<U>> pair_left{{orbleft_dummy, 1}};
             vector<tkv_pair<U>> pair_right{{orbright_dummy, 1}};
-
-//          vector<tkv_pair<U>> pairs;
-
-//            for (int vec = 0; vec < nI; vec++) {
-//              pairs.push_back(tkv_pair<U>(vec, vec)) ;
-//            }
 
             CTFTensor<U>& tensor1 = ap({!isvrt_right && isalpha_right, isvrt_right && isalpha_right}, {0,0})({0});
             if (arena.rank == 0)
@@ -265,7 +285,6 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                 tensor2.writeRemoteData(pair_left);
             else
                 tensor2.writeRemoteData();
-
 
             if ((isvrt_right) && (isvrt_left))
             {
@@ -284,6 +303,15 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                  */
                 e(1)[  "a"]  = -L(1)[  "ka"]*apt["k"];
                 e(2)["iab"]  = -L(2)["ikab"]*apt["k"];
+
+                if (orbright != orbleft)
+                {
+                 b(1)[  "a"] -= T(1)[  "ak"]*apt["k"];
+                 b(2)["abi"] -= T(2)["abik"]*apt["k"];
+
+                 e(1)[  "a"] -= L(1)[  "ka"]*ap["k"];
+                 e(2)["iab"] -= L(2)["ikab"]*ap["k"];
+                }
             }
 
             else if((isvrt_right) && (!isvrt_left))
@@ -293,18 +321,23 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                  * b  (e) = t
                  *  ijk...   ijk...
                  */
-                b(1)[  "a"] = -T(1)[  "ak"]*ap["k"];
-                b(2)["abi"] = -T(2)["abik"]*ap["k"];
 
+                b(1)[  "a"]  =              apt["a"]; //new
+                b(1)[  "a"] -= T(1)[  "ak"]*ap["k"];
+                b(2)["abi"] = -T(2)["abik"]*ap["k"];
                 /*
                  *  ijk...           ij...     ijk...
                  * e  (m) = d  (1 + l     ) + G
                  *  ab...    km      ab...     abm...
                  */
                 e(1)[  "a"]  =               apt["a"];
+
                 e(1)[  "a"]  +=   Dab[  "ea"]*apt["e"];
                 e(2)["iab"]  =  L(1)[  "ia"]*apt["b"];
                 e(2)["iab"]  += Gieab["eiba"]*apt["e"];
+                e(1)[  "a"]  -= L(1)[  "ka"]*ap["k"];  //new
+                e(2)["iab"]  -= L(2)["ikab"]*ap["k"];  //new
+
             }
             else if((!isvrt_right) && (isvrt_left))
             {
@@ -313,14 +346,22 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                  *  i       im
                  */
                 b(1)["a"] = ap["a"];
+                b(1)[  "a"] -= T(1)[  "ak"]*apt["k"]; //new
+                b(2)["abi"] = -T(2)["abik"]*apt["k"]; //new
 
                 /*
                  *  ijk...   ijk...
                  * e  (e) = l
                  *  ab...    abe...
                  */
-                e(1)[  "a"]  = -L(1)[  "ka"]*apt["k"];
+
+                e(1)[  "a"]   =               ap["a"];
+                e(1)[  "a"]  -= L(1)[  "ka"]*apt["k"];
                 e(2)["iab"]  = -L(2)["ikab"]*apt["k"];
+
+                e(1)[  "a"]  +=   Dab[  "ea"]*ap["e"];
+                e(2)["iab"]  +=  L(1)[  "ia"]*ap["b"];
+                e(2)["iab"]  += Gieab["eiba"]*ap["e"];
             }
             else
             {
@@ -339,37 +380,28 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                 e(1)[  "a"]  +=   Dab[  "ea"]*apt["e"];
                 e(2)["iab"]  =  L(1)[  "ia"]*apt["b"];
                 e(2)["iab"]  += Gieab["eiba"]*apt["e"];
+
+               if (orbright != orbleft)
+              {
+                b(1)["a"] += apt["a"];  //new
+                e(1)[  "a"]  +=               ap["a"]; //extra
+                e(1)[  "a"]  +=   Dab[  "ea"]*ap["e"];
+                e(2)["iab"]  +=  L(1)[  "ia"]*ap["b"];
+                e(2)["iab"]  += Gieab["eiba"]*ap["e"];
+              }
             }
 
-
-            //printf("<E|E>: %.15f\n", scalar(e*e));
-            //printf("<B|B>: %.15f\n", scalar(b*b));
-            //printf("<E|B>: %.15f\n", scalar(e(1)["m"]*b(1)["m"])+0.5*scalar(e(2)["mne"]*b(2)["emn"]));
 
               auto& D = this->puttmp("D", new Denominator<U>(H));
            
               int number_of_vectors = nI*nA*nA + nA ; 
               this->puttmp("lanczos", new Lanczos<U,X>(lanczos_config,number_of_vectors));
 
+              RL = b ;
+              LL = e ;
+            
              /* Evaluate norm 
               */ 
-                RL(1) = b(1) ;
-                RL(1) += e(1) ;
-//                RL(1) = 0.5*RL(1) ;
-                LL(1) = e(1) ;
-                LL(1) += b(1) ;
-//                LL(1) = 0.5*LL(1) ;
-
-                RL(2)["abi"] = e(2)["iab"] ;
-                RL(2)["abi"] += b(2)["abi"] ;
-//                RL(2)["abi"] = 0.5*RL(2)["abi"] ;
-                LL(2)["iab"] = b(2)["abi"] ;
-                LL(2)["iab"] += e(2)["iab"] ;
-//                LL(2)["iab"] = 0.5*LL(2)["iab"] ;
-            if (orbright == orbleft)
-            { RL = b ;
-              LL = e ;
-            }
 
               U norm = sqrt(aquarius::abs(scalar(RL*LL))); 
               RL /= norm;
@@ -408,8 +440,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
 
             for (int i=0 ; i < nvec_lanczos ; i++){
-              printf("real eigenvalues: %.15f\n", s_tmp[i].real());
-              printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
+//            printf("real eigenvalues: %.15f\n", s_tmp[i].real());
+//            printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
              }
 
             U piinverse = 1.0/M_PI ;
@@ -430,7 +462,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               CU com_one(1.,0.) ;
               omega = {o.real(),o.imag()} ;
 
-              this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
+//              this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
 
              for(int i=(nvec_lanczos-1);i >= 0;i--){  
               alpha_temp = {alpha[i],0.} ;
@@ -451,8 +483,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
   //          gomega << o.real() << " " << piinverse*value.imag()*norm*norm << std::endl ; 
   //         gomega.close();
 
-              printf("real value : %.15f\n", value.real()*norm*norm);
-              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
+//              printf("real value : %.15f\n", value.real()*norm*norm);
+//              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
               omega_counter += 1 ;
 
              }
@@ -465,7 +497,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             gomega.open ("gomega_ea.dat", ofstream::out|std::ios::app);
 
             for (int i=0 ; i < omegas.size() ; i++){
-               gomega << omegas[i].real() << " " <<(-1/M_PI)*spec_func[i].imag() << std::endl ; 
+//               gomega << omegas[i].real() << " " <<(-1/M_PI)*spec_func[i].imag() << std::endl ; 
             }
 
             gomega.close();
@@ -486,20 +518,33 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
          vector<U> c_full ; 
          vector<U> fock;
 
-        for (int nspin = 0;nspin < maxspin;nspin++)
-         {
-         for (int i = 0;i < nirreps;i++)
-          {
-           vector<int> irreps = {i,i};
-           (nspin == 0) ? cA_.getAllData(irreps, cA[i]) : ca_.getAllData(irreps, ca[i]);
-           assert(cA[i].size() == N[i]*nA[i]);
-           assert(ca[i].size() == N[i]*na[i]);
-           (nspin == 0) ? cI_.getAllData(irreps, cI[i]) : ci_.getAllData(irreps, ci[i]);
-           assert(cI[i].size() == N[i]*nI[i]);
-           assert(ci[i].size() == N[i]*ni[i]);
-          }        
+       /* Reading one electron integrals here. It will be nicer to read them separately within a function.. 
+        */   
 
-          c_full.clear() ;  
+          std::ifstream one_diag("one_diag.txt");
+          std::istream_iterator<U> start(one_diag), end;
+          vector<U> diagonal(start, end);
+          std::copy(diagonal.begin(), diagonal.end(),std::back_inserter(integral_diagonal)); 
+
+          std::ifstream onsite("onsite.txt");
+          std::istream_iterator<U> start_v(onsite), end_v;
+          vector<U> int_onsite(start_v, end_v);
+          std::copy(int_onsite.begin(), int_onsite.end(), std::back_inserter(v_onsite)) ;
+
+   for (int nspin = 0;nspin < maxspin;nspin++)
+   {
+    for (int i = 0;i < nirreps;i++)
+     {
+       vector<int> irreps = {i,i};
+       (nspin == 0) ? cA_.getAllData(irreps, cA[i]) : ca_.getAllData(irreps, ca[i]);
+       assert(cA[i].size() == N[i]*nA[i]);
+       assert(ca[i].size() == N[i]*na[i]);
+       (nspin == 0) ? cI_.getAllData(irreps, cI[i]) : ci_.getAllData(irreps, ci[i]);
+       assert(cI[i].size() == N[i]*nI[i]);
+       assert(ci[i].size() == N[i]*ni[i]);
+     }        
+
+     c_full.clear() ;  
     for (int i = 0;i < nirreps;i++)
     {
       (nspin == 0) ? c_full.insert(c_full.begin(),cI[i].begin(),cI[i].end()) : c_full.insert(c_full.begin(),ci[i].begin(),ci[i].end());
@@ -520,20 +565,25 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 //      for (int i = 0; i < 1; i++) 
 //      {
 //           new_value = new_value + c_full[p*norb+i]*c_full[p*norb+i]*fock[p] ; 
-           printf("value of MO coefficients %10d %10f\n",p, c_full[p*norb+(orbital-1)]);
+//           printf("value of MO coefficients %10d %10f\n",p, c_full[p*norb+(orbital-1)]);
 //        }
        }
 
-         printf("value of AO fock  %10f\n",new_value);
+//         printf("value of AO fock  %10f\n",new_value);
 
-    vector<CU> gf_ao(omegas.size(),{0.,0.}) ;
     vector<CU> self_energy_ao(omegas.size(),{0.,0.}) ;
+
+     std::ifstream iffile("g_0_omega.dat");
+     if (iffile) remove("g_0_omega.dat");
 
     for (int omega = 0; omega < omegas.size() ;omega++)
     {
-      vector<int> ipiv(norb) ;
+      vector<CU> gf_ao(nr_impurities*nr_impurities,{0.,0.}) ;
+      vector<int> ipiv(nr_impurities) ;
       vector<CU> gf_tmp(norb*norb) ;
       vector<CU> gf_zero_inv(norb*norb) ;
+      vector<CU> G_inv(nr_impurities*nr_impurities) ;
+
       for (int p = 0; p < norb ;p++)
       {
         for (int q = 0; q < norb ;q++)
@@ -542,52 +592,91 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
           {
             gf_zero_inv[p*norb+q] = omegas[omega] - fock[q] ;
             gf_tmp[p*norb+q] = gf_ip[nspin][omega][p][q] + gf_ea[nspin][omega][p][q] ; 
-//          gf_tmp[p*norb+q] =  gf_ip[omega][p][q] ; 
           }
           if (q != p )
           { 
             gf_zero_inv[p*norb+q] =  {0.,0.} ;
             gf_tmp[p*norb+q]  = 0.5*( gf_ip[nspin][omega][p][q] - gf_ip[nspin][omega][p][p] - gf_ip[nspin][omega][q][q]) ; 
             gf_tmp[p*norb+q] += 0.5*( gf_ea[nspin][omega][p][q] - gf_ea[nspin][omega][p][p] - gf_ea[nspin][omega][q][q]) ; 
-
-//          gf_tmp[p*norb+q]  = 0.5*( gf_ip[omega][p][q] - gf_ip[omega][p][p] - gf_ip[omega][q][q]) ; 
-//          gf_tmp[p*norb+q] += 0.5*( gf_ea[omega][p][q] - gf_ea[omega][p][p] - gf_ea[omega][q][q]) ; 
           }
 //           printf("Real and Imaginary value of the Green's function %10f %15f %15f\n",omegas[omega].imag(), gf_tmp[0].real(), gf_tmp[0].imag());
 
-//        for (int i = 2; i < 3; i++) 
-//        {
-            gf_ao[omega] = gf_ao[omega] + c_full[p*norb+(orbital-1)]*c_full[q*norb+(orbital-1)]*gf_tmp[p*norb+q] ; 
-//        }  
+          for (int i = 0; i < nr_impurities; i++) 
+          {
+           for (int j = 0; j < nr_impurities; j++) 
+           {
+            gf_ao[i*nr_impurities + j] = gf_ao[i*nr_impurities + j] + c_full[p*norb+i]*c_full[q*norb+j]*gf_tmp[p*norb+q] ; 
+
+            if (omega == 0) cout << omegas[omega].imag() << " " << i << " " << j << " " << gf_ao[i*nr_impurities+j].real() << " " << gf_ao[i*nr_impurities+j].imag() << std::endl ; 
+           }  
+          }
         }
       }
 
-// Dyson Equation  
+//       for (int i = 0; i < nr_impurities; i++) 
+//        {
+//         for (int j = 0; j < nr_impurities; j++) 
+//         {
+//           if (omega == 0) cout << omegas[omega].imag() << " " << i << " " << j << " " << gf_ao[i*nr_impurities+j].real() << " " << gf_ao[i*nr_impurities+j].imag() << std::endl ; 
+//         }  
+//        }
 
-            getrf( norb, norb, gf_tmp.data(), norb, ipiv.data() ) ;
+  /* calculate bare Green's function..
+   */  
 
-            getri( norb, gf_tmp.data(), norb, ipiv.data()) ;
+    std::ofstream gzero_omega;
 
-            axpy (norb*norb, -1.0, gf_tmp.data(), 1, gf_zero_inv.data(), 1);
-       
-            for (int p = 0; p < norb ;p++)
-             {
-             for (int q = 0; q < norb ;q++)
-              {
-//             for (int i = 2; i < 3; i++) 
-//              {
-                 self_energy_ao[omega] = self_energy_ao[omega] + c_full[p*norb+(orbital-1)]*c_full[q*norb+(orbital-1)]*gf_zero_inv[p*norb+q] ; 
-//                }
-              }
-             }
+    for (int u = 0; u < nr_impurities; u++)
+     {
+     for (int v = 0; v < nr_impurities; v++)
+      {
+       CU Hybridization{0.,0.} ;
+       for (int b = nr_impurities; b < norb; b++)
+       {
+        Hybridization += (integral_diagonal[u*norb+b]*integral_diagonal[v*norb+b])/(omegas[omega] - integral_diagonal[b*norb+b]) ;
+       }
+        if (v == u) 
+        {
+         G_inv[u*nr_impurities+v] = omegas[omega] - integral_diagonal[u*norb+v] -  Hybridization + 0.5*v_onsite[u]  ;
+        }
+        else
+        {
+         G_inv[u*nr_impurities+v] = - integral_diagonal[u*norb+v] -  Hybridization  ;
+        } 
 
-             std::ofstream gomega;
-             gomega.open ("gomega.dat", ofstream::out|std::ios::app);
-              gomega << nspin << " " << omegas[omega].imag() << " " << gf_ao[omega].real() << " " << gf_ao[omega].imag() << std::endl ; 
-             gomega.close();
+//         gzero_omega << omegas[omega].imag() << " " << u << " " << v << " " << G_inv[u*nr_impurities+v].real() << " " << G_inv[u*nr_impurities+v].imag() << std::endl ; 
+      }
+     }
+       gzero_omega.close();
 
-//           printf("Real and Imaginary value of the Green's function %10f %15f %15f\n",omegas[omega].real(), gf_ao[omega].real(), -(1.0/M_PI)*gf_ao[omega].imag());
-           printf("Self Energy real and imaginary %5d %10f %20f %20f\n",nspin, omegas[omega].imag(), self_energy_ao[omega].real(), self_energy_ao[omega].imag());
+   /* Dyson Equation  
+    */
+       for (int b = 0 ; b < nr_impurities; b++)
+       {
+         std::stringstream stream;
+          stream << "gomega_"<<nspin<<"_"<<b<< ".txt";
+          std::string fileName = stream.str();
+         std::ofstream gomega;
+          gomega.open (fileName.c_str(), ofstream::out|std::ios::app);
+          gomega << nspin << " " << b << " " << omegas[omega].imag() << " " << gf_ao[b*nr_impurities+b].real() << " " << gf_ao[b*nr_impurities+b].imag() << std::endl ; 
+         gomega.close();
+       }
+         getrf(nr_impurities, nr_impurities, gf_ao.data(), nr_impurities, ipiv.data() ) ;
+
+         getri(nr_impurities, gf_ao.data(), nr_impurities, ipiv.data()) ;
+
+         axpy (nr_impurities*nr_impurities, -1.0, gf_ao.data(), 1, G_inv.data(), 1);
+
+      for (int b = 0 ; b < nr_impurities; b++)
+       {
+         std::stringstream stream;
+          stream << "self_energy_"<<nspin<<"_"<<b<< ".txt";
+          std::string fileName = stream.str();
+         std::ofstream gomega1;
+          gomega1.open (fileName.c_str(), ofstream::out|std::ios::app);
+          gomega1 << nspin << " " << b << " " << omegas[omega].imag() << " " << G_inv[b*nr_impurities+b].real() << " " << G_inv[b*nr_impurities+b].imag() << std::endl ; 
+         gomega1.close();
+       }
     } 
    }
             return true;
@@ -702,8 +791,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               gamma_temp = gamma[i] ;
               value = 1.0/(alpha_temp + beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
-              }
              }
+            }
              
               old_value.push_back(value) ;
 
@@ -735,6 +824,7 @@ npoint int,
 omega_min double,
 omega_max double,
 eta double,
+impurities int,
 grid?
   enum{ real, imaginary },
 orbital_range?

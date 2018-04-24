@@ -27,8 +27,10 @@ Hubbard<U>::Hubbard(const string& name,input::Config& config)
 {
    nelec = config.get<int>("num_electrons");
    norb = config.get<int>("num_orbitals");
-   radius = config.get<double>("radius");
+   ndoc = config.get<int>("doubly_occupied");
    multiplicity = config.get<int>("multiplicity") ;
+   openshell_alpha = config.get<string>("openshell_alpha") ;
+   openshell_beta = config.get<string>("openshell_beta") ;
    dimension = config.get<int>("dimension");
    nalpha = getNumAlphaElectrons() ;
    nbeta = getNumBetaElectrons() ;
@@ -43,10 +45,12 @@ static const char* spec = R"!(
 
 num_electrons int,
 num_orbitals int,
-radius double,
 dimension? int 1,
 multiplicity?
-    int 1
+    int 1,
+doubly_occupied int,
+openshell_alpha string, 
+openshell_beta string 
 
 )!";
 

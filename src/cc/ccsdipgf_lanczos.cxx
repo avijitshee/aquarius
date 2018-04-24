@@ -344,55 +344,21 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               }
             }
 
-
-
-
-
-
-
-
-
-
-
-
-
-            //printf("<E|E>: %.15f\n", scalar(e*e));
-            //printf("<B|B>: %.15f\n", scalar(b*b));
-            //printf("<E|B>: %.15f\n", scalar(e(1)["m"]*b(1)["m"])+0.5*scalar(e(2)["mne"]*b(2)["emn"]));
-
               auto& D = this->puttmp("D", new Denominator<U>(H));
            
               int number_of_vectors = nI*nI*nA + nI ; 
               this->puttmp("lanczos", new Lanczos<U,X>(lanczos_config,number_of_vectors));
+               
+                RL = b ;
+                LL = e ;
 
              /* Evaluate norm 
               */ 
-               
-                RL(1) = b(1) ;
-                RL(1) += e(1) ;
-                LL(1) = e(1) ;
-                LL(1) += b(1) ;
-
-                RL(2)["aij"] = e(2)["ija"] ;
-                RL(2)["aij"] += b(2)["aij"] ;
-                LL(2)["ija"] = b(2)["aij"] ;
-                LL(2)["ija"] += e(2)["ija"] ;
-
-              if (orbright == orbleft)
-              {
-                RL = b ;
-                LL = e ;
-              }
 
               U norm = sqrt(aquarius::abs(scalar(RL*LL))); 
               printf("print norm: %10f\n", norm);
               RL /= norm;
               LL /= norm;
-
-//              norm = sqrt(aquarius::abs(scalar(e*b))); 
-//              printf("print norm: %10f\n", norm);
-              Nij["ij"] = e(1)[  "i"]*b(1)[  "j"]  ;
-              Nij["ij"] -= e(2)["ime"]*b(2)["ejm"];
 
               Iterative<U>::run(dag, arena);
 
@@ -450,7 +416,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               omega = {o.real(),o.imag()} ;
 //            omega = {-o.real(),o.imag()} ;
 
-             this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
+//             this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
 
             /*Evaluate continued fraction 
              */
@@ -475,8 +441,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 //  //           gomega << o.imag() << " " << value.real()*norm*norm << std::endl ; 
     //       gomega.close();
 
-              printf("real value : %.15f\n", value.real()*norm*norm);
-              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
+//              printf("real value : %.15f\n", value.real()*norm*norm);
+//              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
               omega_counter += 1 ;
              }
           }
@@ -522,8 +488,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             auto& alpha = this->template gettmp<unique_vector<U>> ("alpha");
             auto& beta  = this->template gettmp<unique_vector<U>> ("beta");
             auto& gamma = this->template gettmp<unique_vector<U>> ("gamma");
-
-            printf("debug 8: %.10f\n", 10.5);
 
             int nvec_lanczos; 
             U value ;

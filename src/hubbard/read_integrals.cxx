@@ -28,9 +28,12 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
 {
     auto& hubbard =this->template get<Hubbard <U>>("hubbard");
 
+    vector<int> alpha_array ;
+    vector<int> beta_array ;
     int norb = hubbard.getNumOrbitals() ;
     int nalpha = hubbard.getNumAlphaElectrons() ;
     int nbeta = hubbard.getNumBetaElectrons() ;
+    int ndoc = hubbard.getDoccOrbitals() ;
 
     vector<vector<double>> E(norb,vector<double>(norb));
 
@@ -67,14 +70,27 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
         ov_pairs.emplace_back(i*norb+i, 1);
     }
 
-    for (int i = 0;i < nalpha;i++)
+    hubbard.alphastring_to_vector(alpha_array) ;
+    hubbard.betastring_to_vector(beta_array) ;
+
+    for (int i = 0;i < ndoc;i++)
     {
         dapairs.emplace_back(i*norb+i, 1);
     }
 
-    for (int i = 0;i < nbeta;i++)
+    for (int i = 0;i < alpha_array.size();i++)
+    {
+        dapairs.emplace_back((i+ndoc)*norb+(i+ndoc), alpha_array[i]);
+    }
+
+    for (int i = 0;i < ndoc;i++)
     {
         dbpairs.emplace_back(i*norb+i, 1);
+    }
+
+    for (int i = 0;i < beta_array.size();i++)
+    {
+        dbpairs.emplace_back((i+ndoc)*norb+(i+ndoc), beta_array[i]);
     }
 
     for (int i = 0;i < norb;i++)

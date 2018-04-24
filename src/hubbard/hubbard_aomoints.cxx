@@ -42,7 +42,7 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     auto& Fa = this->template get<SymmetryBlockedTensor<U>>("Fa");
     auto& Fb = this->template get<SymmetryBlockedTensor<U>>("Fb");
 
-    vector<vector<U>> cA(nirreps), ca(nirreps), cI(nirreps), ci(nirreps);
+    vector<vector<U>> cA(nirreps), ca(nirreps), cI(nirreps), ci(nirreps), FA(nirreps), FB(nirreps);
 
     const vector<int>& N = occ.nao;
     const vector<int>& nI = occ.nalpha;
@@ -51,7 +51,6 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     const vector<int>& na = vrt.nbeta;
 
     int norb = N[0]; 
-    int nocc = nI[0]; 
 
      printf("Print number of alpha and beta orbitals: %d %d %d\n ",norb, nI[0],ni[0]);
 
@@ -66,6 +65,8 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
         assert(cI[i].size() == N[i]*nI[i]);
         ci_.getAllData(irreps, ci[i]);
         assert(ci[i].size() == N[i]*ni[i]);
+        Fa.getAllData(irreps, FA[i]);
+        Fb.getAllData(irreps, FB[i]);
     }
 
     vector<vector<U>> E(norb,vector<U>(norb));
@@ -90,7 +91,8 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     {
     for (int j = 0; j < norb ; j++)
     {
-//     printf("Print mo, ao and coefficient: %d %d %.15f\n ",i,j,Ea[0][i*norb+j]);
+//      printf("Print AO Fock matrix Fa: %d %d %.15f\n ",i,j,FA[0][i*norb+j]);
+//      printf("Print AO Fock matrix Fb: %d %d %.15f\n ",i,j,FB[0][i*norb+j]);
     }
     }
 

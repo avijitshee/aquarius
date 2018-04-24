@@ -27,21 +27,60 @@ class Hubbard
         double radius;
         vector<vec3> gvecs;
         int nocc;
+        int ndoc;
         int nalpha;
         int nbeta;
         int multiplicity ;
         int nirreps = 1;
         vector<U> integral_diagonal ;
         vector<U> integral_offdiagonal ;
+        vector<int> alpha_array ;
+        vector<int> beta_array ;
+        string openshell_alpha ;
+        string openshell_beta ; 
 
     public:
         vector<U> v_onsite ;
         Hubbard(const string& name, input::Config& config);
-        int getNumAlphaElectrons() const { return (nelec+multiplicity)/2; } ;
+        int getNumAlphaElectrons()
+        {
+         alphastring_to_vector (alpha_array) ; 
+         int countzero = std::count (alpha_array.begin(), alpha_array.end(), 0); 
+         int nopenshell = alpha_array.size() ;
+         return (nopenshell - countzero + ndoc);
+        } ;
+        int getNumBetaElectrons()
+        {
+         betastring_to_vector (beta_array) ; 
+         int countzero = std::count (beta_array.begin(), beta_array.end(), 0); 
+         int nopenshell = beta_array.size() ;
+         return (nopenshell - countzero + ndoc);
+        } ;
 
-        int getNumBetaElectrons() const { return (nelec-multiplicity+1)/2; } ;
         int getNumOrbitals() const { return norb; } ;
+        int getDoccOrbitals() const { return ndoc; } ;
         int getNumIrreps() const { return nirreps; } ;
+
+        void alphastring_to_vector(vector<int>& alphavec )
+        {
+         alphavec.clear() ; 
+        
+         for (size_t i = 0; i < openshell_alpha.size(); ++i)
+         {                                 
+          alphavec.push_back(openshell_alpha[i] - '0'); 
+         } 
+
+        }
+
+        void betastring_to_vector(vector<int>& betavec)
+        {
+         betavec.clear() ;
+         for (size_t i = 0; i < openshell_beta.size(); ++i)
+         {                                 
+          betavec.push_back(openshell_beta[i] - '0'); 
+         }
+        }
+
         void read_1e_integrals()
         {
           std::ifstream one_diag("one_diag.txt");

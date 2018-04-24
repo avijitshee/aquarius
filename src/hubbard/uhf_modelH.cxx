@@ -492,8 +492,9 @@ void uhf_modelh<T>::calcDensity()
 template <typename T>
 void uhf_modelh<T>::buildFock()
 {
-    int norb = 12 ;
-    int nirrep = 1;
+   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   const int norb = hubbard.getNumOrbitals();
+   int nirrep = hubbard.getNumIrreps() ;
 
     for (int i = 1;i < nirrep;i++) ;
 
@@ -543,12 +544,13 @@ void uhf_modelh<T>::buildFock()
    *fockb = (densa+densb)*v_onsite - densb*v_onsite 
    */
 
+//      if (this->iter() > 1) {
        for (int k = 0;k < norb;k++)
        {
-        focka[i][k+k*norb] += densa[i][k+k*norb]*v_onsite[k];
-        fockb[i][k+k*norb] += densb[i][k+k*norb]*v_onsite[k];
+        focka[i][k+k*norb] += (densa[i][k+k*norb]+densb[i][k+k*norb])*v_onsite[k] -  densa[i][k+k*norb]*v_onsite[k] ;
+        fockb[i][k+k*norb] += (densa[i][k+k*norb]+densb[i][k+k*norb])*v_onsite[k] -  densb[i][k+k*norb]*v_onsite[k] ;
        }
-
+//     }
         if (Da.norm(2) > 1e-10)
         {
             //fill(focka[i].begin(), focka[i].end(), 0.0);
