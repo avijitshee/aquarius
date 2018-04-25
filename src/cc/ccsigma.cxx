@@ -6,7 +6,6 @@
 #include "operator/st2eoperator.hpp"
 #include "operator/excitationoperator.hpp"
 #include "hubbard/uhf_modelH.hpp"
-#include "mocoeff.hpp"
 
 using namespace aquarius::hubbard;
 using namespace aquarius::tensor;
@@ -21,26 +20,31 @@ namespace cc
 {
 
 template <typename U>
-class CCSDSIGMA : public MOCoeffs<U>
+class CCSDSIGMA: public Task 
 {
     protected:
         typedef complex_type_t<U> CU;
 
-        int orbital;
         vector<CU> omegas;
         CU omega;
         int nmax;
         int nr_impurities; 
+        string gf_type ;
         vector<U> integral_diagonal ;
         vector<U> v_onsite ;
 
     public:
-        CCSDSIGMA(const string& name, Config& config)
-        :MOCoeffs<U>(name, config)
+        CCSDSIGMA(const string& name, Config& config): Task(name, config)
         {
             vector<Requirement> reqs;
+            reqs.emplace_back("occspace", "occ");
+            reqs.emplace_back("vrtspace", "vrt");
+            reqs.emplace_back("Ea", "Ea");
+            reqs.emplace_back("Eb", "Eb");
             reqs.emplace_back("ccsd.ipgflanczos", "gf_ip");
             reqs.emplace_back("ccsd.eagflanczos", "gf_ea");
+            this->addProduct(Product("ccsd.sigma", "sigma", reqs));
+
 
             double from = config.get<double>("omega_min");
             double to = config.get<double>("omega_max");
@@ -49,6 +53,7 @@ class CCSDSIGMA : public MOCoeffs<U>
             nr_impurities = config.get<int>("impurities"); 
             double beta = config.get<double>("beta");
             string grid_type = config.get<string>("grid");
+            gf_type = config.get<string>("gftype");  
 
             double delta = (to-from)/max(1,nmax-1);
             for (int i = 0;i < nmax;i++)
@@ -61,8 +66,8 @@ class CCSDSIGMA : public MOCoeffs<U>
         bool run(TaskDAG& dag, const Arena& arena)
         {
          int nirreps = 1;
-         auto& gf_ip = this->template get<vector<vector<vector<vector<CU>>>>>("gf_ip");
          auto& gf_ea = this->template get<vector<vector<vector<vector<CU>>>>>("gf_ea");
+         auto& gf_ip = this->template get<vector<vector<vector<vector<CU>>>>>("gf_ip");
 
          const auto& occ = this->template get<MOSpace<U>>("occ");
          const auto& vrt = this->template get<MOSpace<U>>("vrt");
@@ -100,8 +105,36 @@ class CCSDSIGMA : public MOCoeffs<U>
            assert(ci[i].size() == N[i]*ni[i]);
          } 
 
-    vector<U> c_full ; 
-    vector<U> fock;
+       vector<U> c_full ; 
+       vector<U> fock;
+
+    /* remove all self-energy and total Green's function files those are already there in the directory..
+     */  
+
+       for (int nspin = 0; nspin < maxspin ; nspin++)   
+       { 
+        for (int i = 0;i < nr_impurities;i++)
+        { 
+          std::stringstream stream;
+          stream << "gomega_"<<nspin<<"_"<<i<< ".txt";
+          std::string fileName = stream.str();
+          std::ifstream gfile(fileName.c_str());
+          if (gfile) remove(fileName.c_str());
+        } 
+       }
+
+       for (int nspin = 0; nspin < maxspin ; nspin++)   
+       { 
+        for (int i = 0;i < nr_impurities;i++)
+        { 
+          std::stringstream stream;
+          stream << "self_energy_"<<nspin<<"_"<<i<< ".txt";
+          std::string fileName = stream.str();
+          std::ifstream sigmafile(fileName.c_str());
+          if (sigmafile) remove(fileName.c_str());
+        } 
+       }
+
 
     /* Reading one electron integrals here. It will be nicer to read them separately within a function.. 
      */   
@@ -143,6 +176,9 @@ class CCSDSIGMA : public MOCoeffs<U>
        (nspin == 0) ? fock.assign(Ea[i].begin(), Ea[i].end()) : fock.assign(Eb[i].begin(), Eb[i].end());
     }
 
+     std::ifstream iffile("g_0_omega.dat");
+     if (iffile) remove("g_0_omega.dat");
+
     for (int omega = 0; omega < omegas.size() ;omega++)
     {
       vector<CU> gf_ao(nr_impurities*nr_impurities,{0.,0.}) ;
@@ -155,6 +191,9 @@ class CCSDSIGMA : public MOCoeffs<U>
       {
         for (int q = 0; q < norb ;q++)
         {
+         
+         if (gf_type == "symmetrized")
+         {
           if (q == p)
           {
             gf_zero_inv[p*norb+q] = omegas[omega] - fock[q] ;
@@ -166,6 +205,11 @@ class CCSDSIGMA : public MOCoeffs<U>
             gf_tmp[p*norb+q]  = 0.5*( gf_ip[nspin][omega][p][q] - gf_ip[nspin][omega][p][p] - gf_ip[nspin][omega][q][q]) ; 
             gf_tmp[p*norb+q] += 0.5*( gf_ea[nspin][omega][p][q] - gf_ea[nspin][omega][p][p] - gf_ea[nspin][omega][q][q]) ; 
           }
+         }
+         else
+         {
+            gf_tmp[p*norb+q] = gf_ip[nspin][omega][p][q] + gf_ea[nspin][omega][p][q] ; 
+         }  
 
           for (int i = 0; i < nr_impurities; i++) 
           {
@@ -176,6 +220,19 @@ class CCSDSIGMA : public MOCoeffs<U>
           }
         }
       }
+
+      for (int i = 0; i < nr_impurities; i++) 
+        {
+         for (int j = 0; j < nr_impurities; j++) 
+         {
+           if (omega == 0) cout << omegas[omega].imag() << " " << i << " " << j << " " << gf_ao[i*nr_impurities+j].real() << " " << gf_ao[i*nr_impurities+j].imag() << std::endl ; 
+         }  
+        }
+
+  /* calculate bare Green's function..
+   */  
+
+    std::ofstream gzero_omega;
 
     for (int u = 0; u < nr_impurities; u++)
      {
@@ -194,16 +251,43 @@ class CCSDSIGMA : public MOCoeffs<U>
         {
          G_inv[u*nr_impurities+v] = - integral_diagonal[u*norb+v] -  Hybridization  ;
         } 
+         gzero_omega << omegas[omega].imag() << " " << u << " " << v << " " << G_inv[u*nr_impurities+v].real() << " " << G_inv[u*nr_impurities+v].imag() << std::endl ; 
+
       }
      }
 
+       gzero_omega.close();
+
    /* Dyson Equation  
     */
+   
+       for (int b = 0 ; b < nr_impurities; b++)
+       {
+         std::stringstream stream;
+          stream << "gomega_"<<nspin<<"_"<<b<< ".txt";
+          std::string fileName = stream.str();
+         std::ofstream gomega;
+          gomega.open (fileName.c_str(), ofstream::out|std::ios::app);
+          gomega << nspin << " " << b << " " << omegas[omega].imag() << " " << gf_ao[b*nr_impurities+b].real() << " " << gf_ao[b*nr_impurities+b].imag() << std::endl ; 
+         gomega.close();
+       }
+
          getrf(nr_impurities, nr_impurities, gf_ao.data(), nr_impurities, ipiv.data() ) ;
 
          getri(nr_impurities, gf_ao.data(), nr_impurities, ipiv.data()) ;
 
          axpy (nr_impurities*nr_impurities, -1.0, gf_ao.data(), 1, G_inv.data(), 1);
+
+       for (int b = 0 ; b < nr_impurities; b++)
+        {
+         std::stringstream stream;
+          stream << "self_energy_"<<nspin<<"_"<<b<< ".txt";
+          std::string fileName = stream.str();
+         std::ofstream gomega1;
+          gomega1.open (fileName.c_str(), ofstream::out|std::ios::app);
+          gomega1 << nspin << " " << b << " " << omegas[omega].imag() << " " << G_inv[b*nr_impurities+b].real() << " " << G_inv[b*nr_impurities+b].imag() << std::endl ; 
+         gomega1.close();
+       }
     } 
    }
       return true;
@@ -216,15 +300,15 @@ class CCSDSIGMA : public MOCoeffs<U>
 static const char* spec = R"(
 
     frequency_points int,
-    basis_type?
-        enum { AO, MO },
     omega_min double,
     omega_max double,
     impurities int,
     eta double,
     beta double, 
     grid?
-        enum{ real, imaginary }
+        enum{ real, imaginary },
+    gftype?
+        enum{ symmetrized, nonsymmetrized }
 )";
 
 INSTANTIATE_SPECIALIZATIONS(aquarius::cc::CCSDSIGMA);
