@@ -241,16 +241,23 @@ class LeftEOMEECCSD : public Iterative<U>
                 Z(1)[  "ia"] += 0.5*WABEJ["efam"]* L(2)["imef"];
                 Z(1)[  "ia"] -= 0.5*WAMIJ["eimn"]* L(2)["mnea"];
 
-                Z(2)["ijab"]  =       FME[  "ia"]* L(1)[  "jb"];
                 Z(2)["ijab"] +=     WAMEF["ejab"]* L(1)[  "ie"];
+
+                printf("test diagram 1: %.15f\n", 0.5*scalar(Z(2)*Z(2)));
+
+                Z(2)["ijab"]  =       FME[  "ia"]* L(1)[  "jb"];
+
+                printf("test diagram 2: %.15f\n", 0.5*scalar(Z(2)*Z(2)));
+                Z(2)["ijab"] += 0.5*WMNIJ["ijmn"]* L(2)["mnab"];
+                printf("test diagram 3: %.15f\n", 0.5*scalar(Z(2)*Z(2)));
+                Z(2)["ijab"] -=     WAMEI["eiam"]* L(2)["mjeb"];
+                printf("test diagram 4: %.15f\n", 0.5*scalar(Z(2)*Z(2)));
                 Z(2)["ijab"] -=     WMNEJ["ijam"]* L(1)[  "mb"];
                 Z(2)["ijab"] +=       FAE[  "ea"]* L(2)["ijeb"];
                 Z(2)["ijab"] -=       FMI[  "im"]* L(2)["mjab"];
                 Z(2)["ijab"] +=       XEA[  "ea"]*WMNEF["ijeb"];
                 Z(2)["ijab"] -=       XIM[  "im"]*WMNEF["mjab"];
-                Z(2)["ijab"] += 0.5*WMNIJ["ijmn"]* L(2)["mnab"];
                 Z(2)["ijab"] += 0.5*WABEF["efab"]* L(2)["ijef"];
-                Z(2)["ijab"] -=     WAMEI["eiam"]* L(2)["mjeb"];
             }
 
             vector<U> energies = davidson.extrapolate(Cs, Zs, D);

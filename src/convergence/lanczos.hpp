@@ -101,8 +101,7 @@ class Lanczos : public task::Destructible
             /* calculate alpha(i) = pT(i)hc_rq(i)
              */ 
 
-//             alpha.push_back(scalar(c_l*hc_r)) ;             
-             alpha.emplace_back(scalar(conj(hc_l)*c_r)) ;             
+             alpha.push_back(scalar(c_l*hc_r)) ;             
 
             /*copy array to a vector 
              */
@@ -253,7 +252,7 @@ class Lanczos : public task::Destructible
              r[0] -= alpha[nextrap]*c_r ;
            }
 
-             if (nextrap > 0) printf(" old c_l: %.10f \n",scalar(old_c_l_particle[0]*old_c_l_particle[0]));
+             if (nextrap > 0) printf(" old c_l: %.10f \n",scalar(conj(old_c_l_particle[0])*old_c_l_particle[0]));
 
             /* calculate s = hc_l - beta(i-1)pT(i-1) - alpha(i)pT(i)
              */

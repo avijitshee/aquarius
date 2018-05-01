@@ -366,22 +366,22 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
               nvec_lanczos = alpha.size() ; 
 
-            /*Define full trdiagonal matrix 
-             */  
+  /*Define full trdiagonal matrix 
+   */  
 
-              vector<U> Tdiag(nvec_lanczos*nvec_lanczos);
+         vector<U> Tdiag(nvec_lanczos*nvec_lanczos);
 
-              for (int i=0 ; i < nvec_lanczos ; i++){
-               for (int j=0 ; j < nvec_lanczos ; j++){
-                 if (j==i) Tdiag[i*nvec_lanczos + j] = alpha[i] ; 
-                 if (j==(i-1))Tdiag[i*nvec_lanczos + j] = beta[j];
-                 if (j==(i+1))Tdiag[i*nvec_lanczos + j] = gamma[i];
-               }
-              }    
+         for (int i=0 ; i < nvec_lanczos ; i++){
+          for (int j=0 ; j < nvec_lanczos ; j++){
+            if (j==i) Tdiag[i*nvec_lanczos + j] = alpha[i] ; 
+            if (j==(i-1))Tdiag[i*nvec_lanczos + j] = beta[j];
+            if (j==(i+1))Tdiag[i*nvec_lanczos + j] = gamma[i];
+          }
+         }    
             
-            /*
-             * Diagonalize the tridiagonal matrix to see if that produces EOM-IP values..
-             */
+  /*
+   * Diagonalize the tridiagonal matrix to see if that produces EOM-IP values..
+   */
 
             vector<U> l(nvec_lanczos*nvec_lanczos);
             vector<CU> s_tmp(nvec_lanczos);
@@ -441,8 +441,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 //  //           gomega << o.imag() << " " << value.real()*norm*norm << std::endl ; 
     //       gomega.close();
 
-//              printf("real value : %.15f\n", value.real()*norm*norm);
-//              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
+              printf("real value : %.15f\n", value.real()*norm*norm);
+              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
               omega_counter += 1 ;
              }
           }

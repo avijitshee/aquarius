@@ -442,8 +442,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
   //          gomega << o.real() << " " << piinverse*value.imag()*norm*norm << std::endl ; 
   //         gomega.close();
 
-//              printf("real value : %.15f\n", value.real()*norm*norm);
-//              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
+              printf("real value : %.15f\n", value.real()*norm*norm);
+              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
               omega_counter += 1 ;
 
              }
@@ -543,7 +543,6 @@ npoint int,
 omega_min double,
 omega_max double,
 eta double,
-impurities int,
 grid?
   enum{ real, imaginary },
 orbital_range?

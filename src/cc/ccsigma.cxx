@@ -108,8 +108,8 @@ class CCSDSIGMA: public Task
        vector<U> c_full ; 
        vector<U> fock;
 
-    /* remove all self-energy and total Green's function files those are already there in the directory..
-     */  
+ /* remove all self-energy and total Green's function files those are already there in the directory..
+  */  
 
        for (int nspin = 0; nspin < maxspin ; nspin++)   
        { 

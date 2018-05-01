@@ -20,7 +20,7 @@ namespace cc
 {
 
 template <typename U>
-class CCSDIPGF : public Iterative<complex_type_t<U>>
+class CCSDEAGF : public Iterative<complex_type_t<U>>
 {
     protected:
         typedef complex_type_t<U> CU;
@@ -35,14 +35,14 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
         string orb_range ;
 
     public:
-        CCSDIPGF(const string& name, Config& config)
+        CCSDEAGF(const string& name, Config& config)
         : Iterative<CU>(name, config), krylov_config(config.get("krylov"))
         {
             vector<Requirement> reqs;
             reqs.emplace_back("ccsd.T", "T");
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
-            this->addProduct("ccsd.ipgf", "gf_ip", reqs);
+            this->addProduct("ccsd.ipgf", "gf_ea", reqs);
 
             orbital = config.get<int>("orbital");
             double from = config.get<double>("omega_min");
@@ -81,63 +81,61 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
             auto& T = this->template get<ExcitationOperator  <U,2>>("T");
             auto& L = this->template get<DeexcitationOperator<U,2>>("L");
 
-            auto& gf_ip = this-> put("gf_ip", new vector<vector<vector<vector<CU>>>>) ;
+            auto& gf_ea = this-> put("gf_ea", new vector<vector<vector<vector<CU>>>>) ;
             
-            SpinorbitalTensor<U> Dij("D(ij)", arena, group, {vrt,occ}, {0,1}, {0,1});
-            SpinorbitalTensor<U> Gijak("G(ij,ak)", arena, group, {vrt,occ}, {0,2}, {1,1});
+            SpinorbitalTensor<U> Dab("D(ab)", arena, group, {vrt,occ}, {1,0}, {1,0});
+            SpinorbitalTensor<U> Gieab("G(am,ef)", arena, group, {vrt,occ}, {1,1}, {2,0});
 
-            SpinorbitalTensor<U> Nij("N(ij)", arena, group, {vrt,occ}, {0,1}, {0,1});
+            Dab["ab"]  =     -L(1)["mb"  ]*T(1)["am"  ];
+            Dab["ab"] -= 0.5*L(2)["kmbe"]*T(2)["aekm"];
 
-            Dij["ij"]  =     L(1)["ie"  ]*T(1)["ej"  ];
-            Dij["ij"] += 0.5*L(2)["imef"]*T(2)["efjm"];
-
-            Gijak["ijak"] = L(2)["ijae"]*T(1)["ek"];
+            Gieab["amef"]  = -L(2)["nmef"]*T(1)[  "an"];
 
           if (orb_range == "full") 
            { orbstart = 0 ;
              orbend = nI + nA ;  
-             gf_ip.resize(maxspin);
+             gf_ea.resize(maxspin);
 
             for (int nspin = 0;nspin < maxspin;nspin++)
              {
-              gf_ip[nspin].resize(omegas.size());
+              gf_ea[nspin].resize(omegas.size());
              }  
 
             for (int nspin = 0;nspin < maxspin;nspin++)
              {
               for (int i = 0;i < omegas.size();i++)
                {
-                gf_ip[nspin][i].resize(orbend);
+                gf_ea[nspin][i].resize(orbend);
                }
              }
              for (int nspin = 0;nspin < maxspin;nspin++)
              for (int i = 0;i < omegas.size();i++)
              for (int j = 0;j < orbend;j++)
              {
-               gf_ip[nspin][i][j].resize(orbend);
+               gf_ea[nspin][i][j].resize(orbend);
              }
            } 
 
            if (orb_range == "diagonal") 
            { orbstart = orbital-1 ;
              orbend = orbital;  
-             gf_ip.resize(maxspin);
+             gf_ea.resize(maxspin);
             for (int nspin = 0;nspin < maxspin;nspin++)
              {
-              gf_ip[nspin].resize(omegas.size());
+              gf_ea[nspin].resize(omegas.size());
              }  
             for (int nspin = 0;nspin < maxspin;nspin++)
              {
               for (int i = 0;i < omegas.size();i++)
                {
-                gf_ip[nspin][i].resize(1);
+                gf_ea[nspin][i].resize(1);
                }
              }
              for (int nspin = 0;nspin < maxspin;nspin++)
              for (int i = 0;i < omegas.size();i++)
              for (int j = 0;j < orbend;j++)
              {
-               gf_ip[nspin][i][j].resize(1);
+               gf_ea[nspin][i][j].resize(1);
              }
            }
 
@@ -151,9 +149,9 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
              printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
 
             bool isalpha_right = false;
-            bool isvrt_right = false;
+            bool isvrt_right = true;
             bool isalpha_left = false;
-            bool isvrt_left = false;
+            bool isvrt_left = true;
 
             int orbleft_dummy = orbleft ;
             int orbright_dummy = orbright ;
@@ -163,7 +161,7 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
                 isalpha_left = true;
                 if ((orbleft ) >= nI)
                 {
-                    isvrt_left = true;
+                    isvrt_left = false;
                     orbleft_dummy = orbleft - nI;
                 }
             }
@@ -171,7 +169,7 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
             {
                 if (orbleft >= ni)
                 {
-                    isvrt_left = true;
+                    isvrt_left = false;
                     orbleft_dummy = orbleft - ni;
                 }
             }
@@ -181,7 +179,7 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
                 isalpha_right = true;
                 if ((orbright ) >= nI)
                 {
-                    isvrt_right = true;
+                    isvrt_right = false;
                     orbright_dummy = orbright - nI;
                 }
             }
@@ -189,37 +187,39 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
             {
                 if (orbright >= ni)
                 {
-                    isvrt_right = true;
+                    isvrt_right = false;
                     orbright_dummy = orbright - ni;
                 }
             }
 
-            auto& Rr = this->puttmp("Rr", new ExcitationOperator  <U,1,2>("Rr", arena, occ, vrt, isalpha_right ? -1 : 1));
-            auto& Ri = this->puttmp("Ri", new ExcitationOperator  <U,1,2>("Ri", arena, occ, vrt, isalpha_right ? -1 : 1));
-            auto& Zr = this->puttmp("Zr", new ExcitationOperator  <U,1,2>("Zr", arena, occ, vrt, isalpha_right ? -1 : 1));
-            auto& Zi = this->puttmp("Zi", new ExcitationOperator  <U,1,2>("Zi", arena, occ, vrt, isalpha_right ? -1 : 1));
-            auto& b  = this->puttmp("b",  new ExcitationOperator  <U,1,2>("b",  arena, occ, vrt, isalpha_right ? -1 : 1));
-            auto& e  = this->puttmp("e",  new DeexcitationOperator<U,1,2>("e",  arena, occ, vrt, isalpha_right ? 1 : -1));
+            auto& Rr = this->puttmp("Rr", new ExcitationOperator  <U,2,1>("Rr", arena, occ, vrt, isalpha_right ? 1 : -1));
+            auto& Ri = this->puttmp("Ri", new ExcitationOperator  <U,2,1>("Ri", arena, occ, vrt, isalpha_right ? 1 : -1));
+            auto& Zr = this->puttmp("Zr", new ExcitationOperator  <U,2,1>("Zr", arena, occ, vrt, isalpha_right ? 1 : -1));
+            auto& Zi = this->puttmp("Zi", new ExcitationOperator  <U,2,1>("Zi", arena, occ, vrt, isalpha_right ? 1 : -1));
 
-            auto& XE = this->puttmp("XE", new SpinorbitalTensor<U>("X(e)", arena, group, {vrt,occ}, {0,0}, {1,0}, isalpha_right ? -1 : 1));
+            auto& b  = this->puttmp("b",  new ExcitationOperator  <U,2,1>("b",  arena, occ, vrt, isalpha_right ? 1 : -1));
+            auto& e  = this->puttmp("e",  new DeexcitationOperator<U,2,1>("e",  arena, occ, vrt, isalpha_right ? -1 : 1));
 
-            SpinorbitalTensor<U> ap ("ap"  , arena, group, {vrt,occ}, {0,0}, {isvrt_right, !isvrt_right}, isalpha_right ? -1 : 1);
-            SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {isvrt_left, !isvrt_left}, {0,0}, isalpha_left ? 1 : -1);
+            auto& XMI = this->puttmp("XMI", new SpinorbitalTensor<U>("X(mi)", arena, group, {vrt,occ}, {0,1}, {0,0}, isalpha_left ? 1 : -1));
 
-            vector<tkv_pair<U>> pair_left{{orbleft_dummy, 1.0}};
-            vector<tkv_pair<U>> pair_right{{orbright_dummy, 1.0}};
+            SpinorbitalTensor<U> ap ("ap"  , arena, group, {vrt,occ}, {!isvrt_right, isvrt_right}, {0,0}, isalpha_right ? 1 : -1);
+            SpinorbitalTensor<U> apt("ap^t", arena, group, {vrt,occ}, {0,0}, {!isvrt_left, isvrt_left}, isalpha_left ? -1 : 1);
 
-            CTFTensor<U>& tensor1 = ap({0,0}, {isvrt_right && isalpha_right, !isvrt_right && isalpha_right})({0});
+            vector<tkv_pair<U>> pair_left{{orbleft_dummy, 1}};
+            vector<tkv_pair<U>> pair_right{{orbright_dummy, 1}};
+
+            CTFTensor<U>& tensor1 = ap({!isvrt_right && isalpha_right, isvrt_right && isalpha_right}, {0,0})({0});
             if (arena.rank == 0)
                 tensor1.writeRemoteData(pair_right);
             else
                 tensor1.writeRemoteData();
 
-            CTFTensor<U>& tensor2 = apt({isvrt_left && isalpha_left, !isvrt_left && isalpha_left}, {0,0})({0});
+            CTFTensor<U>& tensor2 = apt({0,0}, {!isvrt_left && isalpha_left, isvrt_left && isalpha_left})({0});
             if (arena.rank == 0)
                 tensor2.writeRemoteData(pair_left);
             else
                 tensor2.writeRemoteData();
+
 
             if ((isvrt_right) && (isvrt_left))
             {
@@ -228,83 +228,51 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
                  * b  (e) = t
                  *  ijk...   ijk...
                  */
-                b(1)[  "i"] = T(1)[  "ei"]*ap["e"];
-                b(2)["aij"] = T(2)["aeij"]*ap["e"];
+                b(1)[  "a"] = -T(1)[  "ak"]*ap["k"];
+                b(2)["abi"] = -T(2)["abik"]*ap["k"];
 
                 /*
                  *  ijk...   ijk...
                  * e  (e) = l
                  *  ab...    abe...
                  */
-                e(1)[  "i"] = L(1)[  "ie"]*apt["e"];
-                e(2)["ija"] = L(2)["ijae"]*apt["e"];
+                e(1)[  "a"]  = -L(1)[  "ka"]*apt["k"];
+                e(2)["iab"]  = -L(2)["ikab"]*apt["k"];
             }
             else if((isvrt_right) && (!isvrt_left))
             {
-                /*
-                 *  ab...    abe...
-                 * b  (e) = t
-                 *  q
-                 *  ijk...   ijk...
-                 */
-                b(1)[  "i"] = T(1)[  "ei"]*ap["e"];
-                b(2)["aij"] = T(2)["aeij"]*ap["e"];
+                b(1)[  "a"] = -T(1)[  "ak"]*ap["k"];
+                b(2)["abi"] = -T(2)["abik"]*ap["k"];
 
-                /*
-                 *  ijk...           ij...     ijk...
-                 * e  (m) = d  (1 + l     ) + G
-                 *  ab...    km      ab...     abm...
-                 */
-                e(1)[  "i"]  =               apt["i"];
-
-                e(1)[  "i"] -=   Dij[  "im"]*apt["m"];
-                e(2)["ija"]  =  L(1)[  "ia"]*apt["j"];
-                e(2)["ija"] -= Gijak["ijam"]*apt["m"];
+                e(1)[  "a"]  =               apt["a"];
+                e(1)[  "a"]  +=   Dab[  "ea"]*apt["e"];
+                e(2)["iab"]  =  L(1)[  "ia"]*apt["b"];
+                e(2)["iab"]  += Gieab["eiba"]*apt["e"];
             }
             else if((!isvrt_right) && (isvrt_left))
             {
-                /*
-                 * b (m) = d
-                 *  i       im
-                 */
-                b(1)["i"] = ap["i"];
-                /*
-                 *  ijk...   ijk...
-                 * e  (e) = l
-                 *  ab...    abe...
-                 */
-                e(1)[  "i"] = L(1)[  "ie"]*apt["e"];
-                e(2)["ija"] = L(2)["ijae"]*apt["e"];
+                b(1)["a"] = ap["a"];
 
+                e(1)[  "a"]  = -L(1)[  "ka"]*apt["k"];
+                e(2)["iab"]  = -L(2)["ikab"]*apt["k"];
             } 
             else
             {
-                /*
-                 * b (m) = d
-                 *  i       im
-                 */
-                b(1)["i"] = ap["i"];
+                b(1)["a"] = ap["a"];
 
-                /*
-                 *  ijk...           ij...     ijk...
-                 * e  (m) = d  (1 + l     ) + G
-                 *  ab...    km      ab...     abm...
-                 */
-                e(1)[  "i"]  =               apt["i"];
-
-                e(1)[  "i"] -=   Dij[  "im"]*apt["m"];
-                e(2)["ija"]  =  L(1)[  "ia"]*apt["j"];
-                e(2)["ija"] -= Gijak["ijam"]*apt["m"];
+                e(1)[  "a"]  =               apt["a"];
+                e(1)[  "a"]  +=   Dab[  "ea"]*apt["e"];
+                e(2)["iab"]  =  L(1)[  "ia"]*apt["b"];
+                e(2)["iab"]  += Gieab["eiba"]*apt["e"];
             }
 
             auto& D = this->puttmp("D", new ComplexDenominator<U>(H));
 
             int omega_counter = 0 ;
-
             for (auto& o : omegas)
             {
-                this->puttmp("krylov", new ComplexLinearKrylov<ExcitationOperator<U,1,2>>(krylov_config, b));
-                omega.real( -o.real());
+                this->puttmp("krylov", new ComplexLinearKrylov<ExcitationOperator<U,2,1>>(krylov_config, b));
+                omega.real( o.real());
                 omega.imag( o.imag());
 
                 this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl;
@@ -318,10 +286,8 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
                 Ri /= norm;
 
                 Iterative<CU>::run(dag, arena);
-
-                if (orb_range == "full") gf_ip[nspin][omega_counter][orbleft][orbright] = value ;
-                if (orb_range == "diagonal") gf_ip[nspin][omega_counter][0][0] = value ;
-
+                if (orb_range == "full") gf_ea[nspin][omega_counter][orbleft][orbright] = value ;
+                if (orb_range == "diagonal") gf_ea[nspin][omega_counter][0][0] = value ;
               omega_counter += 1 ;
             }
            }
@@ -343,67 +309,55 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
             const SpinorbitalTensor<U>& WMNEJ = H.getIJAK();
             const SpinorbitalTensor<U>& WAMIJ = H.getAIJK();
             const SpinorbitalTensor<U>& WAMEI = H.getAIBJ();
+            const SpinorbitalTensor<U>& WAMEF = H.getAIBC();
+            const SpinorbitalTensor<U>& WABEF = H.getABCD();
+            const SpinorbitalTensor<U>& WABEJ = H.getABCI();
 
             auto& T = this->template get<ExcitationOperator<U,2>>("T");
 
-            auto& XE = this->template gettmp<SpinorbitalTensor<U>>("XE");
+            auto& XMI = this->template gettmp<SpinorbitalTensor<U>>("XMI");
 
             auto& D = this->template gettmp<ComplexDenominator<U>>("D");
-            auto& krylov = this->template gettmp<ComplexLinearKrylov<ExcitationOperator<U,1,2>>>("krylov");
+            auto& krylov = this->template gettmp<ComplexLinearKrylov<ExcitationOperator<U,2,1>>>("krylov");
 
-            auto& Rr = this->template gettmp<  ExcitationOperator<U,1,2>>("Rr");
-            auto& Ri = this->template gettmp<  ExcitationOperator<U,1,2>>("Ri");
-            auto& Zr = this->template gettmp<  ExcitationOperator<U,1,2>>("Zr");
-            auto& Zi = this->template gettmp<  ExcitationOperator<U,1,2>>("Zi");
-            auto& b  = this->template gettmp<  ExcitationOperator<U,1,2>>("b");
-            auto& e  = this->template gettmp<DeexcitationOperator<U,1,2>>("e");
+            auto& Rr = this->template gettmp< ExcitationOperator<U,2,1>>("Rr");
+            auto& Ri = this->template gettmp< ExcitationOperator<U,2,1>>("Ri");
+            auto& Zr = this->template gettmp< ExcitationOperator<U,2,1>>("Zr");
+            auto& Zi = this->template gettmp< ExcitationOperator<U,2,1>>("Zi");
+            auto& b  = this->template gettmp<  ExcitationOperator<U,2,1>>("b");
+            auto& e  = this->template gettmp<DeexcitationOperator<U,2,1>>("e");
 
-            //printf("<Rr|Rr>: %.15f\n", scalar(Rr*Rr));
-            //printf("<Ri|Ri>: %.15f\n", scalar(Ri*Ri));
-            //printf("<Rr|Ri>: %.15f\n", scalar(Rr*Ri));
-
-            //printf("<B|Rr>: %.15f\n", scalar(b*Rr));
-            //printf("<B|Ri>: %.15f\n", scalar(b*Ri));
 
             for (int ri: {0,1})
             {
-                ExcitationOperator<U,1,2>& R = (ri == 0 ? Rr : Ri);
-                ExcitationOperator<U,1,2>& Z = (ri == 0 ? Zr : Zi);
+                ExcitationOperator<U,2,1>& R = (ri == 0 ? Rr : Ri);
+                ExcitationOperator<U,2,1>& Z = (ri == 0 ? Zr : Zi);
 
-                  XE[  "e"]  = -0.5*WMNEF["mnfe"]*R(2)[ "fmn"];
+                XMI[  "m"] = -0.5*WMNEF["mnef"]*R(2)["efn"];
 
-                Z(1)[  "i"]  =       -FMI[  "mi"]*R(1)[   "m"];
-                Z(1)[  "i"] +=        FME[  "me"]*R(2)[ "emi"];
-                Z(1)[  "i"] -=  0.5*WMNEJ["mnei"]*R(2)[ "emn"];
+                Z(1)[  "a"]  =       FAE[  "ae"]*R(1)[  "e"];
+                Z(1)[  "a"] -=       FME[  "me"]*R(2)["aem"];
+                Z(1)[  "a"] -= 0.5*WAMEF["amef"]*R(2)["efm"];
 
-                Z(2)["aij"]  =     -WAMIJ["amij"]*R(1)[   "m"];
-                Z(2)["aij"] +=        FAE[  "ae"]*R(2)[ "eij"];
-                Z(2)["aij"] -=        FMI[  "mi"]*R(2)[ "amj"];
-                Z(2)["aij"] +=         XE[   "e"]*T(2)["aeij"];
-                Z(2)["aij"] +=  0.5*WMNIJ["mnij"]*R(2)[ "amn"];
-                Z(2)["aij"] -=      WAMEI["amei"]*R(2)[ "emj"];
+                Z(2)["abi"]   =     WABEJ["baei"]*R(1)[  "e"];
+                Z(2)["abi"]  +=       FAE[  "ae"]*R(2)["ebi"];
+                Z(2)["abi"]  -=       FMI[  "mi"]*R(2)["abm"];
+                Z(2)["abi"]  -=       XMI[  "m"]*T(2)["abim"];
+                Z(2)["abi"]  += 0.5*WABEF["abef"]*R(2)["efi"];
+                Z(2)["abi"]  -=     WAMEI["amei"]*R(2)["ebm"];
             }
 
-            //printf("<Z1|Z1>: %.15f\n", scalar(Zr(1)*Zr(1)));
-            //printf("<Z2|Z2>: %.15f\n", 0.5*scalar(Zr(2)*Zr(2)));
-            //printf("<Zr|Zr>: %.15f\n", scalar(Zr*Zr));
-            //printf("<Zi|Zi>: %.15f\n", scalar(Zi*Zi));
+ /*
+  * Convert H*r to (w-H)*r
+  */
 
-            /*
-             * Convert H*r to (H-w)*r
-             */
+              Zr *= -1;
+              Zi *= -1;
+
               Zr += omega.real()*Rr;
-              Zr += omega.imag()*Ri;
+              Zr -= omega.imag()*Ri;
               Zi += omega.real()*Ri;
-              Zi -= omega.imag()*Rr;
-
-//           Zr += omega.real()*Rr;
-//           Zr -= omega.imag()*Ri;
-//           Zi += omega.real()*Ri;
-//           Zi += omega.imag()*Rr;
-
-//            Zr *= -1;
-//            Zi *= -1;
+              Zi += omega.imag()*Rr;
 
             //printf("<Ur|Ur>: %.15f\n", scalar(Zr*Zr));
             //printf("<Ui|Ui>: %.15f\n", scalar(Zi*Zi));
@@ -414,13 +368,12 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
 
             krylov.getSolution(Zr, Zi);
 
-            this->energy() = CU(    scalar(e(1)[  "m"]*Zr(1)[  "m"]) +
-                                0.5*scalar(e(2)["mne"]*Zr(2)["emn"]),
-                                    scalar(e(1)[  "m"]*Zi(1)[  "m"]) +
-                                0.5*scalar(e(2)["mne"]*Zi(2)["emn"]));
-
-              value = {scalar(e(1)[  "m"]*Zi(1)[  "m"]) + 0.5*scalar(e(2)["mne"]*Zi(2)["emn"]), scalar(e(1)[  "m"]*Zi(1)[  "m"]) + 0.5*scalar(e(2)["mne"]*Zi(2)["emn"])} ;
-
+            this->energy() = CU(    scalar(e(1)[  "a"]*Zr(1)[  "a"]) +
+                                0.5*scalar(e(2)["iab"]*Zr(2)["abi"]),
+                                    scalar(e(1)[  "a"]*Zi(1)[  "a"]) +
+                                0.5*scalar(e(2)["iab"]*Zi(2)["abi"]));
+ 
+            value = {scalar(e(1)[  "a"]*Zr(1)[  "a"]) + 0.5*scalar(e(2)["iab"]*Zr(2)["abi"]), scalar(e(1)[  "a"]*Zi(1)[  "a"])+0.5*scalar(e(2)["iab"]*Zi(2)["abi"])};
         }
 };
 
@@ -456,5 +409,5 @@ krylov?
 
 )";
 
-INSTANTIATE_SPECIALIZATIONS(aquarius::cc::CCSDIPGF);
-REGISTER_TASK(aquarius::cc::CCSDIPGF<double>, "ccsdipgf",spec);
+INSTANTIATE_SPECIALIZATIONS(aquarius::cc::CCSDEAGF);
+REGISTER_TASK(aquarius::cc::CCSDEAGF<double>, "ccsdeagf",spec);
