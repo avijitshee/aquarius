@@ -544,7 +544,7 @@ void uhf_modelh<T>::buildFock()
    *fockb = (densa+densb)*v_onsite - densb*v_onsite 
    */
 
-      if (this->iter() > 1) {
+      if (this->iter() > 0) {
        for (int k = 0;k < norb;k++)
        {
         focka[i][k+k*norb] += (densa[i][k+k*norb]+densb[i][k+k*norb])*v_onsite[k] -  densa[i][k+k*norb]*v_onsite[k] ;
