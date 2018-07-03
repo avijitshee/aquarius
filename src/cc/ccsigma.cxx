@@ -29,7 +29,8 @@ class CCSDSIGMA: public Task
         CU omega;
         int nmax;
         int nr_impurities; 
-        string gf_type ;
+        int gf_type ;
+        double beta ;
         vector<U> integral_diagonal ;
         vector<U> v_onsite ;
 
@@ -41,27 +42,48 @@ class CCSDSIGMA: public Task
             reqs.emplace_back("vrtspace", "vrt");
             reqs.emplace_back("Ea", "Ea");
             reqs.emplace_back("Eb", "Eb");
-            reqs.emplace_back("ccsd.ipgflanczos", "gf_ip");
-            reqs.emplace_back("ccsd.eagflanczos", "gf_ea");
+            reqs.emplace_back("Fa", "Fa");
+            reqs.emplace_back("Fb", "Fb");
+            reqs.emplace_back("ccsd.ipgf", "gf_ip");
+            reqs.emplace_back("ccsd.eagf", "gf_ea");
             this->addProduct(Product("ccsd.sigma", "sigma", reqs));
-
 
             double from = config.get<double>("omega_min");
             double to = config.get<double>("omega_max");
             nmax = config.get<double>("frequency_points");
             double eta = config.get<double>("eta");
             nr_impurities = config.get<int>("impurities"); 
-            double beta = config.get<double>("beta");
+            beta = config.get<double>("beta");
             string grid_type = config.get<string>("grid");
-            gf_type = config.get<string>("gftype");  
+            string gf_string = config.get<string>("gftype");  
 
             double delta = (to-from)/max(1,nmax-1);
             for (int i = 0;i < nmax;i++)
             {
-               if (grid_type == "real") omegas.emplace_back(from+delta*i, eta);
+//             if (grid_type == "imaginary") {omegas.emplace_back(0.,0.);
+//                         omegas.emplace_back(0.,(2.0*i+1)*M_PI/beta);}
                if (grid_type == "imaginary") omegas.emplace_back(0.,(2.0*i+1)*M_PI/beta);
+               if (grid_type == "real") omegas.emplace_back(from+delta*i, eta);
             }
+
+            if (gf_string == "symmetrized") gf_type = 1 ;
+            if (gf_string == "nonsymmetrized") gf_type = 2 ;
          } 
+
+
+//       inline U f_tau(U tau, U beta, U c1, U c2, U c3){
+//          return -0.5*c1 + (c2*0.25)*(-beta+2.*tau) + (c3*0.25)*(beta*tau-tau*tau);
+//       }
+
+//       inline std::complex<U> f_omega(std::complex<U> iw, U c1, U c2, U c3) {
+//         std::complex<ft_float_type> iwsq=iw*iw;
+//         return c1/iw + c2/(iwsq) + c3/(iw*iwsq);
+//       }
+
+//       double &c1(int s1, int s2, int f){ return c1_[s1*ns_*nf_+s2*nf_+f]; }
+//       double &c2(int s1, int s2, int f){ return c2_[s1*ns_*nf_+s2*nf_+f]; }
+//       double &c3(int s1, int s2, int f){ return c3_[s1*ns_*nf_+s2*nf_+f]; }
+
 
         bool run(TaskDAG& dag, const Arena& arena)
         {
@@ -74,6 +96,9 @@ class CCSDSIGMA: public Task
 
          auto& Ea = this->template get<vector<vector<real_type_t<U>>>>("Ea");
          auto& Eb = this->template get<vector<vector<real_type_t<U>>>>("Eb");
+
+         auto& Fa     = this->template get   <SymmetryBlockedTensor<U>>("Fa");
+         auto& Fb     = this->template get   <SymmetryBlockedTensor<U>>("Fb");
 
          const SymmetryBlockedTensor<U>& cA_ = vrt.Calpha;
          const SymmetryBlockedTensor<U>& ca_ = vrt.Cbeta;
@@ -135,9 +160,8 @@ class CCSDSIGMA: public Task
         } 
        }
 
-
-    /* Reading one electron integrals here. It will be nicer to read them separately within a function.. 
-     */   
+ /* Reading one electron integrals here. It will be nicer to read them separately within a function.. 
+  */   
 
        std::ifstream one_diag("one_diag.txt");
        std::istream_iterator<U> start(one_diag), end;
@@ -148,6 +172,9 @@ class CCSDSIGMA: public Task
        std::istream_iterator<U> start_v(onsite), end_v;
        vector<U> int_onsite(start_v, end_v);
        std::copy(int_onsite.begin(), int_onsite.end(), std::back_inserter(v_onsite)) ;
+
+    vector<U> density(norb*norb,{0.}) ;
+    U energy = 0. ; 
  
    for (int nspin = 0;nspin < maxspin;nspin++)
    {
@@ -174,7 +201,17 @@ class CCSDSIGMA: public Task
     for (int i = 0;i < nirreps;i++)
     {
        (nspin == 0) ? fock.assign(Ea[i].begin(), Ea[i].end()) : fock.assign(Eb[i].begin(), Eb[i].end());
+//       (nspin == 0) ? Fa({i,i}).getAllData(fock) : Fb({i,i}).getAllData(fock);
     }
+
+      for (int p = 0; p < norb ;p++)
+      {
+        for (int q = 0; q < norb ;q++)
+        {
+           if (p==q) density[p*norb+q] += 0.5;
+           density[p*norb+q] -= fock[p*norb+q]*(beta/4.);
+        }
+      }
 
      std::ifstream iffile("g_0_omega.dat");
      if (iffile) remove("g_0_omega.dat");
@@ -182,8 +219,10 @@ class CCSDSIGMA: public Task
     for (int omega = 0; omega < omegas.size() ;omega++)
     {
       vector<CU> gf_ao(nr_impurities*nr_impurities,{0.,0.}) ;
-      vector<int> ipiv(nr_impurities) ;
-      vector<CU> gf_tmp(norb*norb) ;
+      vector<int> ipiv(norb) ;
+//      vector<int> ipiv(nr_impurities) ;
+      vector<CU> gf_tmp(norb*norb,{0.,0.}) ;
+      vector<CU> gf_original(norb*norb,{0.,0.}) ;
       vector<CU> gf_zero_inv(norb*norb) ;
       vector<CU> G_inv(nr_impurities*nr_impurities) ;
 
@@ -191,25 +230,34 @@ class CCSDSIGMA: public Task
       {
         for (int q = 0; q < norb ;q++)
         {
-         
-         if (gf_type == "symmetrized")
-         {
-          if (q == p)
+
+       if (gf_type == 1)
+       {
+         if (q == p)
           {
-            gf_zero_inv[p*norb+q] = omegas[omega] - fock[q] ;
+            gf_zero_inv[p*norb+q] =(omegas[omega] - fock[p]) ;
+//            gf_zero_inv[p*norb+q] = (omegas[omega] - fock[p*norb+q]) ;
             gf_tmp[p*norb+q] = gf_ip[nspin][omega][p][q] + gf_ea[nspin][omega][p][q] ; 
           }
           if (q != p )
           { 
             gf_zero_inv[p*norb+q] =  {0.,0.} ;
+//            gf_zero_inv[p*norb+q] = -fock[p*norb+q] ;
             gf_tmp[p*norb+q]  = 0.5*( gf_ip[nspin][omega][p][q] - gf_ip[nspin][omega][p][p] - gf_ip[nspin][omega][q][q]) ; 
             gf_tmp[p*norb+q] += 0.5*( gf_ea[nspin][omega][p][q] - gf_ea[nspin][omega][p][p] - gf_ea[nspin][omega][q][q]) ; 
           }
-         }
-         else
-         {
-            gf_tmp[p*norb+q] = gf_ip[nspin][omega][p][q] + gf_ea[nspin][omega][p][q] ; 
-         }  
+        }
+        else 
+        {
+         gf_tmp[p*norb+q] = gf_ip[nspin][omega][p][q] + gf_ea[nspin][omega][p][q] ; 
+        }
+
+//          if (omega == 0) {density[p*norb+q] +=gf_tmp[p*norb+q].real() ;
+//          }else{ 
+//           density[p*norb+q] += (2.0/beta)*(cos(omegas[omega].imag()*beta)*gf_tmp[p*norb+q].real()-sin(omegas[omega].imag()*beta)*gf_tmp[p*norb+q].imag()s) ;
+//         density[p*norb+q] += (2.0/beta)*(gf_tmp[p*norb+q].real()) ;
+//         density[p*norb+q] += (2.0/beta)*(gf_zero_inv[p*norb+q].real()) ;
+//           }
 
           for (int i = 0; i < nr_impurities; i++) 
           {
@@ -222,17 +270,18 @@ class CCSDSIGMA: public Task
       }
 
       for (int i = 0; i < nr_impurities; i++) 
+       {
+        for (int j = 0; j < nr_impurities; j++) 
         {
-         for (int j = 0; j < nr_impurities; j++) 
-         {
-           if (omega == 0) cout << omegas[omega].imag() << " " << i << " " << j << " " << gf_ao[i*nr_impurities+j].real() << " " << gf_ao[i*nr_impurities+j].imag() << std::endl ; 
-         }  
-        }
+//        if (omega == 0) cout << omegas[omega].imag() << " " << i << " " << j << " " << gf_ao[i*nr_impurities+j].real() << " " << gf_ao[i*nr_impurities+j].imag() << std::endl ; 
+        }  
+       }
 
   /* calculate bare Green's function..
    */  
 
     std::ofstream gzero_omega;
+    gzero_omega.open("g_0_omega.txt", ofstream::out);
 
     for (int u = 0; u < nr_impurities; u++)
      {
@@ -245,14 +294,13 @@ class CCSDSIGMA: public Task
        }
         if (v == u) 
         {
-         G_inv[u*nr_impurities+v] = omegas[omega] - integral_diagonal[u*norb+v] -  Hybridization + 0.5*v_onsite[u]  ;
+         G_inv[u*nr_impurities+v] = omegas[omega] - integral_diagonal[u*norb+v] - Hybridization + 0.5*v_onsite[u]  ;
         }
         else
         {
          G_inv[u*nr_impurities+v] = - integral_diagonal[u*norb+v] -  Hybridization  ;
         } 
          gzero_omega << omegas[omega].imag() << " " << u << " " << v << " " << G_inv[u*nr_impurities+v].real() << " " << G_inv[u*nr_impurities+v].imag() << std::endl ; 
-
       }
      }
 
@@ -268,15 +316,52 @@ class CCSDSIGMA: public Task
           std::string fileName = stream.str();
          std::ofstream gomega;
           gomega.open (fileName.c_str(), ofstream::out|std::ios::app);
-          gomega << nspin << " " << b << " " << omegas[omega].imag() << " " << gf_ao[b*nr_impurities+b].real() << " " << gf_ao[b*nr_impurities+b].imag() << std::endl ; 
+          gomega << omegas[omega].real() << " " << omegas[omega].imag() << " " << gf_ao[b*nr_impurities+b].real() << " " << (-1./M_PI)*gf_ao[b*nr_impurities+b].imag() << std::endl ; 
+//        gomega << omegas[omega].real() << " " << omegas[omega].imag() << " " << gf_ao[b*nr_impurities+b].real() << " " << gf_ao[b*nr_impurities+b].imag() << std::endl ; 
          gomega.close();
        }
 
-         getrf(nr_impurities, nr_impurities, gf_ao.data(), nr_impurities, ipiv.data() ) ;
+//         getrf(nr_impurities, nr_impurities, gf_ao.data(), nr_impurities, ipiv.data() ) ;
 
-         getri(nr_impurities, gf_ao.data(), nr_impurities, ipiv.data()) ;
+//         getri(nr_impurities, gf_ao.data(), nr_impurities, ipiv.data()) ;
 
-         axpy (nr_impurities*nr_impurities, -1.0, gf_ao.data(), 1, G_inv.data(), 1);
+//         axpy (nr_impurities*nr_impurities, -1.0, gf_ao.data(), 1, G_inv.data(), 1);
+
+           copy(norb, gf_tmp.data(), 1, gf_original.data(), 1) ;
+
+           getrf(norb, norb, gf_tmp.data(), norb, ipiv.data() ) ;
+
+           getri(norb, gf_tmp.data(), norb, ipiv.data()) ;
+
+           axpy (norb*norb, -1.0, gf_tmp.data(), 1, gf_zero_inv.data(), 1);
+
+   //    ipiv.clear() ;
+
+   //    ipiv.resize(norb) ;
+
+   //    getrf(norb, norb, gf_zero_inv.data(), norb, ipiv.data() ) ;
+
+   //    getri(norb, gf_zero_inv.data(), norb, ipiv.data()) ;
+   // for (int p = 0; p < norb ;p++)
+   // {
+   //   for (int q = 0; q < norb ;q++)
+   //   {
+   //     density[p*norb+q] += (2.0/beta)*(cos(omegas[omega].imag()*beta)*gf_zero_inv[p*norb+q].real()-sin(omegas[omega].imag()*beta)*gf_zero_inv[p*norb+q].imag()+(fock[p*norb+q]/pow(omegas[omega].imag(),2))) ;
+// //       density[p*norb+q] += (2.0/beta)*(gf_zero_inv[p*norb+q].real()-1.0/omegas[omega]+(fock[p*norb+q]/pow(omegas[omega].imag(),2))).real() ;
+// //       density[p*norb+q] += (2.0/beta)*(gf_zero_inv[p*norb+q].real()) ;
+// //       density[p*norb+q] += (2.0/beta)*(gf_tmp[p*norb+q].real() - gf_zero_inv[p*norb+q].real()) ;
+   //   }
+   // }
+
+      for (int p = 0; p < norb ;p++)
+      {
+        for (int q = 0; q < norb ;q++)
+        {
+         
+          energy +=(gf_zero_inv[p*norb+q].real()*gf_original[p*norb+q].real() - gf_zero_inv[p*norb+q].imag()*gf_original[p*norb+q].imag()) ;
+
+        }
+      } 
 
        for (int b = 0 ; b < nr_impurities; b++)
         {
@@ -290,6 +375,45 @@ class CCSDSIGMA: public Task
        }
     } 
    }
+
+      printf("total energy: %.15f\n", 2.0*(energy/beta));
+
+      for (int p = 0; p < norb ;p++)
+      {
+        for (int q = 0; q < norb ;q++)
+        {
+
+//           density[p*norb+q] += 0.5;
+//           if (p==q) density[p*norb+q] += 0.5;
+//           if ((p<nI) && (q<nI) && (p==q)) density[p*norb+q] += 1.;
+           density[p*norb+q] *= 2 ;
+//           if ((p<nI) && (q<nI) && (p==q)) density[p*norb+q] += 2;
+//            density[p*norb+q] += 0.1 ;
+//           cout << p << " " << q << " " << density[p*norb+q] << std::endl ; 
+        }
+      }
+
+         vector<U> l(norb*norb);
+         vector<CU> s_tmp(norb);
+         vector<U> vr_tmp(norb*norb);
+
+         U value = 0. ; 
+         int info = geev('N', 'V', norb, density.data(), norb,
+                     s_tmp.data(), l.data(), norb,
+                     vr_tmp.data(), norb);
+         if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
+
+
+         cout<<" #orbital occupation" <<endl ;
+
+         for (int i=0 ; i < norb ; i++){
+             printf(" %.15f\n", s_tmp[i].real());
+             value += s_tmp[i].real();
+//             value += density[i*norb+i];
+          }
+
+         printf("total occupancy: %.15f\n", value);
+
       return true;
    }
   };
@@ -306,9 +430,9 @@ static const char* spec = R"(
     eta double,
     beta double, 
     grid?
-        enum{ real, imaginary },
+        enum{ imaginary, real },
     gftype?
-        enum{ symmetrized, nonsymmetrized }
+        enum{ symmetrized, nonsymmetrized },
 )";
 
 INSTANTIATE_SPECIALIZATIONS(aquarius::cc::CCSDSIGMA);

@@ -134,42 +134,6 @@ class CCSD : public Iterative<U>
             auto& WAMIJ = this->template gettmp<SpinorbitalTensor<U>>("WAMIJ");
             auto& WAMEI = this->template gettmp<SpinorbitalTensor<U>>("WAMEI");
 
-
-            SpinorbitalTensor<double> Delta("Delta", arena, H.getIJKL().getGroup(), {H.occ,H.occ}, {0,2}, {0,2});
-
-            int x = 0 ;
-
-            vector<tkv_pair<U>> pairsa;
-
-            for (int i = 0;i < H.occ.nalpha[0] ;i++)
-            { 
-            for (int j = 0;j < H.occ.nalpha[0] ;j++)
-             {
-             for (int k = 0;k < H.occ.nalpha[0] ;k++)
-              {
-              for (int l = 0;l < H.occ.nalpha[0] ;l++)
-               {
-
-                 pairsa.emplace_back(x, 0.0) ;
-
-               if ((k == i) && (l == j))  pairsa.emplace_back(x, 1.0);
-                x += 1 ; 
-
-               }
-              }
-             }
-            }
-
-           vector<U> temp ;
-     
-            Delta({0,0},{0,0})({0,0,0,0}).writeRemoteData(pairsa);
-            Delta({0,2},{0,2})({0,0,0,0}).writeRemoteData(pairsa);
-            Delta({0,1},{0,1})({0,0,0,0}).writeRemoteData(pairsa);
-
-            pairsa.clear() ;
-
-            fMI({0,0},{0,0})({0,0}).getAllData(temp) ;
-
             Tau["abij"]  = T(2)["abij"];
             Tau["abij"] += 0.5*T(1)["ai"]*T(1)["bj"];
 
@@ -239,11 +203,6 @@ class CCSD : public Iterative<U>
             this->energy() = real(scalar(H.getAI()*T(1))) + 0.25*real(scalar(H.getABIJ()*Tau));
             this->conv() = Z.norm(00);
 
-//            printf("print HF energy: %.15f\n",real(scalar(H.getIJ())) + real(scalar(H.getIJKL())));
-//            printf("print HF energy: %.15f\n", real(scalar(H.getIJKL()*H.getIJKL())));
-            printf("print HF energy: %.15f\n", 2.0*sum(temp) - 0.25*real(scalar(H.getIJKL()*Delta)));
-
-            temp.clear() ;
             diis.extrapolate(T, Z);
         }
 
