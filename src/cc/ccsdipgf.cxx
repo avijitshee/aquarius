@@ -135,7 +135,7 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
              }
              for (int nspin = 0;nspin < maxspin;nspin++)
              for (int i = 0;i < omegas.size();i++)
-             for (int j = 0;j < orbend;j++)
+             for (int j = 0;j < 1;j++)
              {
                gf_ip[nspin][i][j].resize(1);
              }
@@ -304,7 +304,7 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
             for (auto& o : omegas)
             {
                 this->puttmp("krylov", new ComplexLinearKrylov<ExcitationOperator<U,1,2>>(krylov_config, b));
-                omega.real( -o.real());
+                omega.real( o.real());
                 omega.imag( o.imag());
 
                 this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl;
@@ -321,6 +321,9 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
 
                 if (orb_range == "full") gf_ip[nspin][omega_counter][orbleft][orbright] = value ;
                 if (orb_range == "diagonal") gf_ip[nspin][omega_counter][0][0] = value ;
+
+              printf("real value : %.15f\n", value.real());
+              printf("imaginary value : %.15f\n", value.imag());
 
               omega_counter += 1 ;
             }
@@ -393,9 +396,9 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
              * Convert H*r to (H-w)*r
              */
               Zr += omega.real()*Rr;
-              Zr += omega.imag()*Ri;
+              Zr -= omega.imag()*Ri;
               Zi += omega.real()*Ri;
-              Zi -= omega.imag()*Rr;
+              Zi += omega.imag()*Rr;
 
 //           Zr += omega.real()*Rr;
 //           Zr -= omega.imag()*Ri;
@@ -419,7 +422,7 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
                                     scalar(e(1)[  "m"]*Zi(1)[  "m"]) +
                                 0.5*scalar(e(2)["mne"]*Zi(2)["emn"]));
 
-              value = {scalar(e(1)[  "m"]*Zi(1)[  "m"]) + 0.5*scalar(e(2)["mne"]*Zi(2)["emn"]), scalar(e(1)[  "m"]*Zi(1)[  "m"]) + 0.5*scalar(e(2)["mne"]*Zi(2)["emn"])} ;
+              value = {scalar(e(1)[  "m"]*Zr(1)[  "m"]) + 0.5*scalar(e(2)["mne"]*Zr(2)["emn"]), scalar(e(1)[  "m"]*Zi(1)[  "m"]) + 0.5*scalar(e(2)["mne"]*Zi(2)["emn"])} ;
 
         }
 };

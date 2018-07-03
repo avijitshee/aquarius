@@ -119,38 +119,44 @@ class CCSDDensity : public Task
 
 // build full CCSD density matrix and then diagonalize to obtain natural orbital occupancies..
 
+
+        U value = 0. ; 
+        int norb = occ.nalpha[0] + vrt.nalpha[0] ; 
+        vector<U> density(norb*norb, 0.) ;
+
+        for (int spin : {1,0})
+        {
            vector<U> oo ;
            vector<U> ov ;
            vector<U> vo ;
            vector<U> vv ;
               
-           DAI({1,0},{0,1})({0,0}).getAllData(vo); 
-           DIA({0,1},{1,0}).getAllData({0,0}, ov);
-           DAB({1,0},{1,0}).getAllData({0,0}, vv);
-           DIJ({0,0},{0,0}).getAllData({0,0}, oo);
+           DAI({spin,0},{0,spin})({0,0}).getAllData(vo); 
+           DIA({0,spin},{spin,0}).getAllData({0,0}, ov);
+           DAB({spin,0},{spin,0}).getAllData({0,0}, vv);
+           DIJ({0,spin},{0,spin}).getAllData({0,0}, oo);
 
-           int nI = occ.nalpha[0];
-           int ni = occ.nbeta[0];
-           int nA = vrt.nalpha[0];
-           int na = vrt.nbeta[0];
+           int nocc = (spin == 1 ? occ.nalpha[0] : occ.nbeta[0]) ;
+           int nvirt = (spin == 1 ? vrt.nalpha[0] : vrt.nbeta[0]) ;
 
-           int norb = nI + nA ; 
+           norb = nocc + nvirt ; 
 
-           vector<U> density(norb*norb) ;
-
-
-           for (int i=0 ; i < norb ; i++){
-             oo[i*nI+i] += 1.0 ;
+           for (int i=0 ; i < nocc ; i++){
+             oo[i*nocc+i] += 1.0 ;
            }
  
            for (int i=0 ; i < norb ; i++){
             for (int j=0 ; j < norb ; j++){
-             if ((i < nI) && (j < nI)) density[i*norb+j] = 2.0*oo[i*nI+j] ; 
-             if ((i < nI) && (j >= nI)) density[i*norb+j] = 2.0*ov[i*nA+(j-nI)] ; 
-             if ((i >= nI) && (j < nI)) density[i*norb+j] = 2.0*vo[(i-nI)*nI+j] ; 
-             if ((i >= nI) && (j >= nI)) density[i*norb+j] = 2.0*vv[(i-nI)*nA+(j-nI)] ; 
+             if ((i < nocc) && (j < nocc)) density[i*norb+j] += 1.0*oo[i*nocc+j] ; 
+             if ((i < nocc) && (j >= nocc)) density[i*norb+j] += 1.0*ov[i*nvirt+(j-nocc)] ; 
+             if ((i >= nocc) && (j < nocc)) density[i*norb+j] += 1.0*vo[(i-nocc)*nocc+j] ; 
+             if ((i >= nocc) && (j >= nocc)) density[i*norb+j] += 1.0*vv[(i-nocc)*nvirt+(j-nocc)] ; 
             }
            } 
+          }
+
+//symmetrize density matrix
+
 
             vector<U> l(norb*norb);
             vector<CU> s_tmp(norb);
@@ -161,15 +167,18 @@ class CCSDDensity : public Task
                         vr_tmp.data(), norb);
             if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
 
-           U value = 0. ; 
 
             cout<<" #orbital occupation" <<endl ;
 
             for (int i=0 ; i < norb ; i++){
-                printf(" %d %.15f\n",i, s_tmp[i].real());
-                value += s_tmp[i].real();
+                printf(" %.15f\n", s_tmp[i].real());
+//                value += s_tmp[i].real();
+                value += density[i*norb+i];
              }
-                printf("total occupancy: %.15f\n", value);
+
+            printf("total occupancy: %.15f\n", value);
+          
+
 
             U EIA = scalar(DIA*H.getIA());
             U EAI = scalar(DAI*H.getAI());

@@ -20,6 +20,8 @@ namespace cc
 template <typename U>
 class CCSDTDensity : public Task
 {
+    protected:
+        typedef complex_type_t<U> CU;
     public:
         CCSDTDensity(const string& name, Config& config)
         : Task(name, config)
@@ -162,6 +164,61 @@ class CCSDTDensity : public Task
             GAIBC *= -1;
             GAIJK *= -1;
             GABCI *= -1;
+
+// build full CCSDT density matrix and then diagonalize to obtain natural orbital occupancies..
+
+        U value = 0. ; 
+        int norb = occ.nalpha[0] + vrt.nalpha[0] ; 
+        vector<U> density(norb*norb, 0.) ;
+
+        for (int spin : {1,0})
+        {
+           vector<U> oo ;
+           vector<U> ov ;
+           vector<U> vo ;
+           vector<U> vv ;
+              
+           DAI({spin,0},{0,spin})({0,0}).getAllData(vo); 
+           DIA({0,spin},{spin,0}).getAllData({0,0}, ov);
+           DAB({spin,0},{spin,0}).getAllData({0,0}, vv);
+           DIJ({0,spin},{0,spin}).getAllData({0,0}, oo);
+
+           int nocc = (spin == 1 ? occ.nalpha[0] : occ.nbeta[0]) ;
+           int nvirt = (spin == 1 ? vrt.nalpha[0] : vrt.nbeta[0]) ;
+
+           norb = nocc + nvirt ; 
+
+           for (int i=0 ; i < nocc ; i++){
+             oo[i*nocc+i] += 1.0 ;
+           }
+ 
+           for (int i=0 ; i < norb ; i++){
+            for (int j=0 ; j < norb ; j++){
+             if ((i < nocc) && (j < nocc)) density[i*norb+j] += 1.0*oo[i*nocc+j] ; 
+             if ((i < nocc) && (j >= nocc)) density[i*norb+j] += 1.0*ov[i*nvirt+(j-nocc)] ; 
+             if ((i >= nocc) && (j < nocc)) density[i*norb+j] += 1.0*vo[(i-nocc)*nocc+j] ; 
+             if ((i >= nocc) && (j >= nocc)) density[i*norb+j] += 1.0*vv[(i-nocc)*nvirt+(j-nocc)] ; 
+            }
+           } 
+          }
+            vector<U> l(norb*norb);
+            vector<CU> s_tmp(norb);
+            vector<U> vr_tmp(norb*norb);
+
+            int info = geev('N', 'V', norb, density.data(), norb,
+                        s_tmp.data(), l.data(), norb,
+                        vr_tmp.data(), norb);
+            if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
+
+
+            cout<<" #orbital occupation" <<endl ;
+
+            for (int i=0 ; i < norb ; i++){
+                printf(" %.15f\n", s_tmp[i].real());
+                value += s_tmp[i].real();
+             }
+
+            printf("total occupancy: %.15f\n", value);
 
             U EIA = scalar(DIA*H.getIA());
             U EAI = scalar(DAI*H.getAI());

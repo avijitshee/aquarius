@@ -45,7 +45,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             reqs.emplace_back("ccsd.T", "T");
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
-            this->addProduct(Product("ccsd.ipgflanczos", "gf_ip", reqs));
+            this->addProduct(Product("ccsd.ipgf", "gf_ip", reqs));
             orbital = config.get<int>("orbital");
             double from = config.get<double>("omega_min");
             double to = config.get<double>("omega_max");
@@ -143,7 +143,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              }
              for (int nspin = 0;nspin < maxspin;nspin++)
              for (int i = 0;i < omegas.size();i++)
-             for (int j = 0;j < orbend;j++)
+             for (int j = 0;j < 1;j++)
              {
                gf_ip[nspin][i][j].resize(1);
              }
@@ -435,14 +435,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              if (orb_range == "full") gf_ip[nspin][omega_counter][orbleft][orbright] = value*norm*norm ;
              if (orb_range == "diagonal") gf_ip[nspin][omega_counter][0][0] = value*norm*norm ;
 
-    //       std::ofstream gomega;
-    //         gomega.open ("gomega.dat", ofstream::out|std::ios::app);
-    //         gomega << o.real() << " " << piinverse*value.imag()*norm*norm << std::endl ; 
-//  //           gomega << o.imag() << " " << value.real()*norm*norm << std::endl ; 
-    //       gomega.close();
-
-              printf("real value : %.15f\n", value.real()*norm*norm);
-              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
+//              printf("real value : %.15f\n", value.real()*norm*norm);
+//              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
               omega_counter += 1 ;
              }
           }
@@ -553,7 +547,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                 delta_value = old_value[nvec_lanczos-2] - value ;
               }
 
-//            this->conv() = max(pow(beta[beta.size()-1],2), pow(gamma[gamma.size()-1],2));
               this->conv() = max(pow(beta[beta.size()-1],2), pow(gamma[gamma.size()-1],2));
 //            this->conv() = aquarius::abs(delta_value) ;
 

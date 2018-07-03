@@ -50,7 +50,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             reqs.emplace_back("ccsd.T", "T");
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
-            this->addProduct(Product("ccsd.eagflanczos", "gf_ea", reqs));
+            this->addProduct(Product("ccsd.eagf", "gf_ea", reqs));
 
             orbital = config.get<int>("orbital");
             double from = config.get<double>("omega_min");
@@ -442,8 +442,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
   //          gomega << o.real() << " " << piinverse*value.imag()*norm*norm << std::endl ; 
   //         gomega.close();
 
-              printf("real value : %.15f\n", value.real()*norm*norm);
-              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
+//              printf("real value : %.15f\n", value.real()*norm*norm);
+//              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
               omega_counter += 1 ;
 
              }
