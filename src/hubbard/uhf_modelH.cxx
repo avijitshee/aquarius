@@ -171,7 +171,7 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
         sort(E_beta[i].begin(), E_beta[i].end());
         for (int j = 0;j < norb;j++)
         {
-         printf("orbital#:  %d energy: %10f %10f\n",j, E_alpha[i][j], E_beta[i][j]);
+//         printf("orbital#:  %d energy: %10f %10f\n",j, E_alpha[i][j], E_beta[i][j]);
         }
         Eb[i].assign(E_beta[i].begin()+nfrozen_beta[i], E_beta[i].end());
     }
@@ -206,6 +206,7 @@ void uhf_modelh<T>::iterate(const Arena& arena)
         for (int j = 0;j < norb;j++)
         {
             E_beta_sorted.push_back(make_pair(E_beta[i][j],i));
+            printf("orbital#:  %d energy: %10f %10f\n",j, E_alpha_sorted[j].first, E_beta_sorted[j].first);
         }
     }
 
@@ -534,9 +535,6 @@ void uhf_modelh<T>::buildFock()
         Db.getAllData(irreps, densb[i]);
         assert(densa[i].size() == norb*norb);
 
-        densab[i] = densa[i];
-        //PROFILE_FLOPS(norb[i]*norb[i]);
-        axpy(norb*norb, 1.0, densb[i].data(), 1, densab[i].data(), 1);
 
   /*construct coulomb and exchange part of the fock matrix from 2-e integrals..
    *for the moment this definition will work. but more general definition would be 
@@ -544,11 +542,13 @@ void uhf_modelh<T>::buildFock()
    *fockb = (densa+densb)*v_onsite - densb*v_onsite 
    */
 
-      if (this->iter() > 1) {
+      if (this->iter() > 0) {
+        densab[i] = densa[i];
+        axpy(norb*norb, 1.0, densb[i].data(), 1, densab[i].data(), 1);
        for (int k = 0;k < norb;k++)
        {
-        focka[i][k+k*norb] += (densa[i][k+k*norb]+densb[i][k+k*norb])*v_onsite[k] -  densa[i][k+k*norb]*v_onsite[k] ;
-        fockb[i][k+k*norb] += (densa[i][k+k*norb]+densb[i][k+k*norb])*v_onsite[k] -  densb[i][k+k*norb]*v_onsite[k] ;
+        focka[i][k+k*norb] += (densab[i][k+k*norb])*v_onsite[k] -  densa[i][k+k*norb]*v_onsite[k] ;
+        fockb[i][k+k*norb] += (densab[i][k+k*norb])*v_onsite[k] -  densb[i][k+k*norb]*v_onsite[k] ;
        }
      }
         if (Da.norm(2) > 1e-10)
