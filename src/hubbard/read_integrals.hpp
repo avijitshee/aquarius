@@ -22,9 +22,25 @@ class ReadInts : public task::Task
     protected:
         vector<U> integral_diagonal ;
         vector<U> v_onsite ;
+        vector<U> mo_coeff ;
+        bool coeff_exists = false ;
 
     public:
         ReadInts(const string& name, input::Config& config);
+
+        void read_coeff()
+        {
+         std::ifstream coeff("coeff.txt");
+         if (coeff)
+         {
+          coeff_exists = true ; 
+          std::istream_iterator<U> start(coeff), end;
+          std::vector<U> coefficient(start, end);
+          std::cout << "Read " << coefficient.size() << " numbers" << std::endl;
+          std::copy(coefficient.begin(), coefficient.end(),std::back_inserter(mo_coeff)); 
+         }
+        }
+
         void read_1e_integrals()
         {
           std::ifstream one_diag("one_diag.txt");

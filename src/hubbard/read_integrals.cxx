@@ -36,9 +36,38 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     int ndoc = hubbard.getDoccOrbitals() ;
 
     vector<vector<double>> E(norb,vector<double>(norb));
+    vector<vector<double>> Dalpha(norb,vector<double>(norb));
+    vector<vector<double>> Dbeta(norb,vector<double>(norb));
 
     read_1e_integrals() ; 
     read_2e_integrals() ; 
+    read_coeff() ;	
+
+
+   if (coeff_exists) 
+   {
+    for (int i = 0;i < norb;i++)
+    {
+     for (int j = 0;j < norb;j++)
+     {
+       for (int k = 0;k < nalpha;k++)
+       {
+         Dalpha[i][j] += mo_coeff[k*norb+i]*mo_coeff[k*norb+j] ;
+       }
+     }
+    }
+
+    for (int i = 0;i < norb;i++)
+    {
+     for (int j = 0;j < norb;j++)
+     {
+       for (int k = 0;k < nbeta;k++)
+       {
+         Dbeta[i][j] += mo_coeff[k*norb+i]*mo_coeff[k*norb+j] ;
+       }
+     }
+    }
+   }
 
     for (int i = 0;i < norb;i++)
     {
@@ -73,6 +102,26 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     hubbard.alphastring_to_vector(alpha_array) ;
     hubbard.betastring_to_vector(beta_array) ;
 
+   if (coeff_exists) 
+   {
+    for (int i = 0;i < norb;i++)
+    {
+       for (int j = 0;j < norb;j++)
+       {
+        dapairs.emplace_back(i*norb+j, Dalpha[i][j]);
+       }
+    }
+
+   for (int i = 0;i < norb;i++)
+    {
+       for (int j = 0;j < norb;j++)
+       {
+        dbpairs.emplace_back(i*norb+j, Dbeta[i][j]);
+       }
+    }
+   }
+   else
+   {
     for (int i = 0;i < ndoc;i++)
     {
         dapairs.emplace_back(i*norb+i, 1);
@@ -92,6 +141,7 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     {
         dbpairs.emplace_back((i+ndoc)*norb+(i+ndoc), beta_array[i]);
     }
+   }
 
     for (int i = 0;i < norb;i++)
     {

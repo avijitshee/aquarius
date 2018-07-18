@@ -19,6 +19,7 @@ class Hubbard_AOMOints : public Hubbard_MOIntegrals<T>
         Hubbard_AOMOints(const string& name, input::Config& config);
 
     protected:
+        int norb ;
         vector<T> v_onsite ;
         bool run(task::TaskDAG& dag, const Arena& arena);
         void writeIntegrals(vector<T>& cfirst, vector<T>& csecond, vector<T>& cthird, vector<T>& cfourth,
