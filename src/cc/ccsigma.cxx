@@ -120,7 +120,8 @@ class CCSDSIGMA: public Task
  
          int maxspin = (nI == ni) ? 1 : 2 ;
 
-         int norb = N[0]; 
+//         int norb = N[0]; 
+         int norb = nI+nA; 
  
          for (int i = 0;i < nirreps;i++)
          {
@@ -181,6 +182,7 @@ class CCSDSIGMA: public Task
        std::copy(int_onsite.begin(), int_onsite.end(), std::back_inserter(v_onsite)) ;
 
     vector<U> density(norb*norb,{0.}) ;
+    vector<CU> sigma(norb*norb,{0.,0.}) ;
     vector<U> fock(norb*norb,0.);
     U energy = 0. ; 
  
@@ -227,7 +229,7 @@ class CCSDSIGMA: public Task
             for (int j=0 ; j < norb ; j++){
              if ((i < nocc) && (j < nocc)) fock[i*norb+j] = fockoo[i*nocc+j] ; 
              if ((i < nocc) && (j >= nocc)) fock[i*norb+j] = fockov[i*nvirt+(j-nocc)] ; 
-//             if ((i >= nocc) && (j < nocc)) fock[i*norb+j] = 1.0*fockov[(i-nocc)*nocc+j] ; 
+//           if ((i >= nocc) && (j < nocc)) fock[i*norb+j] = 1.0*fockov[(i-nocc)*nocc+j] ; 
              if ((i >= nocc) && (j >= nocc)) fock[i*norb+j] = fockvv[(i-nocc)*nvirt+(j-nocc)] ; 
              fock[j*norb+i] = fock[i*norb+j] ;
             }
@@ -245,6 +247,7 @@ class CCSDSIGMA: public Task
      std::ifstream iffile("g_0_omega.dat");
      if (iffile) remove("g_0_omega.dat");
 
+
     for (int omega = 0; omega < omegas.size() ;omega++)
     {
       vector<CU> gf_ao(nr_impurities*nr_impurities,{0.,0.}) ;
@@ -252,8 +255,10 @@ class CCSDSIGMA: public Task
 //      vector<int> ipiv(nr_impurities) ;
       vector<CU> gf_tmp(norb*norb,{0.,0.}) ;
       vector<CU> gf_original(norb*norb,{0.,0.}) ;
-      vector<CU> gf_zero_inv(norb*norb) ;
+      vector<CU> gf_zero_inv(norb*norb,{0.,0.}) ;
       vector<CU> G_inv(nr_impurities*nr_impurities) ;
+
+      sigma.clear() ;
 
       for (int p = 0; p < norb ;p++)
       {
@@ -266,7 +271,7 @@ class CCSDSIGMA: public Task
           {
 //            gf_zero_inv[p*norb+q] =1.0/(omegas[omega] - fock[p]) ;
            gf_zero_inv[p*norb+q] = (omegas[omega] - fock[p*norb+q]) ;
-            gf_tmp[p*norb+q] = gf_ip[nspin][omega][p][q] + gf_ea[nspin][omega][p][q] ; 
+           gf_tmp[p*norb+q] = gf_ip[nspin][omega][p][q] + gf_ea[nspin][omega][p][q] ; 
           }
           if (q != p )
           { 
@@ -288,13 +293,13 @@ class CCSDSIGMA: public Task
 //         density[p*norb+q] += (2.0/beta)*(gf_zero_inv[p*norb+q].real()) ;
 //           }
 
-          for (int i = 0; i < nr_impurities; i++) 
-          {
-           for (int j = 0; j < nr_impurities; j++) 
-           {
-            gf_ao[i*nr_impurities + j] = gf_ao[i*nr_impurities + j] + c_full[p*norb+i]*c_full[q*norb+j]*gf_tmp[p*norb+q] ; 
-           }  
-          }
+//        for (int i = 0; i < nr_impurities; i++) 
+//        {
+//         for (int j = 0; j < nr_impurities; j++) 
+//         {
+//          gf_ao[i*nr_impurities + j] = gf_ao[i*nr_impurities + j] + c_full[p*norb+i]*c_full[q*norb+j]*gf_tmp[p*norb+q] ; 
+//         }  
+//        }
         }
       }
 
@@ -302,38 +307,38 @@ class CCSDSIGMA: public Task
        {
         for (int j = 0; j < nr_impurities; j++) 
         {
-//        if (omega == 0) cout << omegas[omega].imag() << " " << i << " " << j << " " << gf_ao[i*nr_impurities+j].real() << " " << gf_ao[i*nr_impurities+j].imag() << std::endl ; 
+        if (omega == 0) cout << omegas[omega].imag() << " " << i << " " << j << " " << gf_ao[i*nr_impurities+j].real() << " " << gf_ao[i*nr_impurities+j].imag() << std::endl ; 
         }  
        }
 
   /* calculate bare Green's function..
    */  
 
-    std::ofstream gzero_omega;
-    gzero_omega.open("g_0_omega.txt", ofstream::out);
+//  std::ofstream gzero_omega;
+//  gzero_omega.open("g_0_omega.txt", ofstream::out);
 
-    for (int u = 0; u < nr_impurities; u++)
-     {
-     for (int v = 0; v < nr_impurities; v++)
-      {
-       CU Hybridization{0.,0.} ;
-       for (int b = nr_impurities; b < norb; b++)
-       {
-        Hybridization += (integral_diagonal[u*norb+b]*integral_diagonal[v*norb+b])/(omegas[omega] - integral_diagonal[b*norb+b]) ;
-       }
-        if (v == u) 
-        {
-         G_inv[u*nr_impurities+v] = omegas[omega] - integral_diagonal[u*norb+v] - Hybridization + 0.5*v_onsite[u]  ;
-        }
-        else
-        {
-         G_inv[u*nr_impurities+v] = - integral_diagonal[u*norb+v] -  Hybridization  ;
-        } 
-         gzero_omega << omegas[omega].imag() << " " << u << " " << v << " " << G_inv[u*nr_impurities+v].real() << " " << G_inv[u*nr_impurities+v].imag() << std::endl ; 
-      }
-     }
+//  for (int u = 0; u < nr_impurities; u++)
+//   {
+//   for (int v = 0; v < nr_impurities; v++)
+//    {
+//     CU Hybridization{0.,0.} ;
+//     for (int b = nr_impurities; b < norb; b++)
+//     {
+//      Hybridization += (integral_diagonal[u*norb+b]*integral_diagonal[v*norb+b])/(omegas[omega] - integral_diagonal[b*norb+b]) ;
+//     }
+//      if (v == u) 
+//      {
+//       G_inv[u*nr_impurities+v] = omegas[omega] - integral_diagonal[u*norb+v] - Hybridization + 0.5*v_onsite[u]  ;
+//      }
+//      else
+//      {
+//       G_inv[u*nr_impurities+v] = - integral_diagonal[u*norb+v] -  Hybridization  ;
+//      } 
+//       gzero_omega << omegas[omega].imag() << " " << u << " " << v << " " << G_inv[u*nr_impurities+v].real() << " " << G_inv[u*nr_impurities+v].imag() << std::endl ; 
+//    }
+//   }
 
-       gzero_omega.close();
+//     gzero_omega.close();
 
    /* Dyson Equation  
     */
@@ -350,27 +355,22 @@ class CCSDSIGMA: public Task
          gomega.close();
        }
 
-           getrf(nr_impurities, nr_impurities, gf_ao.data(), nr_impurities, ipiv.data() ) ;
+           copy(norb*norb, gf_tmp.data(), 1, gf_original.data(), 1) ;
+           copy(norb*norb, gf_zero_inv.data(), 1, sigma.data(), 1) ;
 
-           getri(nr_impurities, gf_ao.data(), nr_impurities, ipiv.data()) ;
+           getrf(norb, norb, gf_tmp.data(), norb, ipiv.data() ) ;
 
-           axpy (nr_impurities*nr_impurities, -1.0, gf_ao.data(), 1, G_inv.data(), 1);
+           getri(norb, gf_tmp.data(), norb, ipiv.data()) ;
 
-//         copy(norb*norb, gf_tmp.data(), 1, gf_original.data(), 1) ;
+           axpy (norb*norb, -1.0, gf_tmp.data(), 1, sigma.data(), 1);
 
-//         getrf(norb, norb, gf_tmp.data(), norb, ipiv.data() ) ;
-
-//         getri(norb, gf_tmp.data(), norb, ipiv.data()) ;
-
-//         axpy (norb*norb, -1.0, gf_tmp.data(), 1, gf_zero_inv.data(), 1);
-
-//        for (int p = 0; p < norb ;p++)
-//        {
-//         for (int q = 0; q < norb ;q++)
-//          {
-//             energy +=(gf_zero_inv[p*norb+q].real()*gf_original[p*norb+q].real() - gf_zero_inv[p*norb+q].imag()*gf_original[p*norb+q].imag()) ;
-//          }
-//        } 
+          for (int p = 0; p < norb ;p++)
+          {
+           for (int q = 0; q < norb ;q++)
+            {
+               energy +=(sigma[p*norb+q].real()*gf_original[p*norb+q].real() - sigma[p*norb+q].imag()*gf_original[p*norb+q].imag()) ;
+            }
+          } 
 
 //         axpy (norb*norb, 1.0, gf_tmp.data(), 1, gf_zero_inv.data(), 1);
 
@@ -386,12 +386,18 @@ class CCSDSIGMA: public Task
         for (int q = 0; q < norb ;q++)
         {
 //          density[p*norb+q] += (2.0/beta)*(cos(omegas[omega].imag()*beta)*gf_original[p*norb+q].real()-sin(omegas[omega].imag()*beta)*gf_original[p*norb+q].imag()) ;
-
 //          density[p*norb+q] += (2.0/beta)*(cos(omegas[omega].imag()*beta)*gf_zero_inv[p*norb+q].real()-sin(omegas[omega].imag()*beta)*gf_zero_inv[p*norb+q].imag()) ;
 //          if (p ==q) density[p*norb+q] += (2.0/beta)*((fock[p]/pow(omegas[omega].imag(),2))) ;
 //          density[p*norb+q] += (2.0/beta)*(gf_zero_inv[p*norb+q].real()-1.0/omegas[omega]+(fock[p*norb+q]/pow(omegas[omega].imag(),2))).real() ;
 //          density[p*norb+q] += (2.0/beta)*(gf_zero_inv[p*norb+q].real()-1.0/omegas[omega]).real() ;
-          density[p*norb+q] += (2.0/beta)*(gf_tmp[p*norb+q].real()-1.0/omegas[omega]+(fock[p*norb+q]/pow(omegas[omega].imag(),2))).real() ;
+//            density[p*norb+q] += (2.0/beta)*(gf_tmp[p*norb+q].real()-1.0/omegas[omega]+(fock[p*norb+q]/pow(omegas[omega].imag(),2))).real() ;
+           if (p == q) 
+           {
+              density[p*norb+q] += (2.0/beta)*(gf_original[p*norb+q].real()-1.0/omegas[omega]+(fock[p*norb+q]/pow(omegas[omega].imag(),2))).real() ;
+           }else{
+              density[p*norb+q] += (2.0/beta)*(gf_original[p*norb+q].real()+(fock[p*norb+q]/pow(omegas[omega].imag(),2))) ;
+           }
+         
 //            density[p*norb+q] += (2.0/beta)*(gf_tmp[p*norb+q].real()-1.0/omegas[omega]).real() ;
 //          density[p*norb+q] += (2.0/beta)*(gf_zero_inv[p*norb+q].real()) ;
 //          density[p*norb+q] += (2.0/beta)*(gf_tmp[p*norb+q].real() - gf_zero_inv[p*norb+q].real()) ;
@@ -412,32 +418,170 @@ class CCSDSIGMA: public Task
     } 
    }
 
-      printf("total energy: %.15f\n", (2.0/beta)*energy);
+      vector<CU> sigma_xx(norb*norb,0.0) ;
+ 
+      for (int p = 0; p < norb ;p++)
+      {
+        for (int q = 0; q < norb ;q++)
+        {
+          sigma_xx[p*norb+q] = -1.0*sigma[p*norb+q].imag()*omegas[nmax-1].imag() ; 
+        }
+      }
+
+      printf("Tr(Sigma.G) energy: %.15f\n", (2.0/beta)*energy);
 
       for (int p = 0; p < norb ;p++)
       {
         for (int q = 0; q < norb ;q++)
         {
-
-//           density[p*norb+q] += 0.5;
-//           if (p==q) density[p*norb+q] += 0.5;
-//           if ((p<nI) && (q<nI) && (p==q)) density[p*norb+q] += 1.;
-           density[p*norb+q] *= 2 ;
-//           if ((p<nI) && (q<nI) && (p==q)) density[p*norb+q] += 2;
-//            density[p*norb+q] += 0.1 ;
-//           cout << p << " " << q << " " << density[p*norb+q] << std::endl ; 
+           density[p*norb+q] *= 1.0 ;
         }
       }
 
+      vector<U> density_ao(norb*norb,0.) ;
+
       energy *=2.0/beta ;
+
+      auto& D = this->puttmp("D", new OneElectronOperator<U>("D", arena, occ, vrt));
+      auto& DIA = D.getIA();
+      auto& DAI = D.getAI();
+      auto& DAB = D.getAB();
+      auto& DIJ = D.getIJ();
+
+      vector<tkv_pair<U>> pairs;
+//      vector<tkv_pair<U>> pair_right{{orbright_dummy, 1}};
+
+     U val ; 
+
+      for (int p = 0; p < nI ;p++)
+      {
+      for (int q = 0; q < nI ;q++)
+       {
+           val = density[p*norb+q];
+           pairs.push_back(tkv_pair<U>(p*nI+q,val)) ;
+       }
+      }
+
+     if (arena.rank == 0){
+        DIJ({0,0},{0,0})({0,0}).writeRemoteData(pairs); 
+        DIJ({0,1},{0,1})({0,0}).writeRemoteData(pairs); }
+     else{
+        DIJ({0,0},{0,0})({0,0}).writeRemoteData(); 
+        DIJ({0,1},{0,1})({0,0}).writeRemoteData(); }
+
+      pairs.clear() ;  
+
+      for (int p = nI; p < norb ;p++)
+      {
+      for (int q = nI; q < norb ;q++)
+       {
+           val = density[p*norb+q];
+           pairs.push_back(tkv_pair<U>((p-nI)*nA+(q-nI),val)) ;
+       }
+      }
+
+     if (arena.rank == 0){
+        DAB({0,0},{0,0})({0,0}).writeRemoteData(pairs); 
+        DAB({1,0},{1,0})({0,0}).writeRemoteData(pairs);}
+     else {
+        DAB({0,0},{0,0})({0,0}).writeRemoteData(); 
+        DAB({1,0},{1,0})({0,0}).writeRemoteData(); }
+
+       const SpinorbitalTensor<U>& WMNIJ = H.getIJKL();
+       const SpinorbitalTensor<U>& WAMEI = H.getAIBJ();
+
+       const PointGroup& group = H.getIJKL().getGroup();
+       int nirrep = group.getNumIrreps();
+
+       auto& XI = this->puttmp("XI", new SpinorbitalTensor<U>("X(i)", arena, group, {vrt,occ}, {0,1}, {0,1}));
+       SpinorbitalTensor<U> delta ("delta"  , arena, group, {vrt,occ}, {0,1}, {0,1});
+
+      pairs.clear() ;
+
+      for (int p = 0; p < nI ;p++)
+      {
+           pairs.push_back(tkv_pair<U>(p*nI+p,1.0)) ;
+      }
+
+     if (arena.rank == 0) {
+       delta({0,0},{0,0})({0,0}).writeRemoteData(pairs); 
+       delta({0,1},{0,1})({0,0}).writeRemoteData(pairs);}
+     else { 
+       delta({0,0},{0,0})({0,0}).writeRemoteData(); 
+       delta({0,1},{0,1})({0,0}).writeRemoteData();} 
+
+       XI["ii"]  = WMNIJ["jiki"]*DIJ["jk"] ;  
+       XI["ii"] += WAMEI["aibi"]*DAB["ab"] ;  
+
+       U E1B = 0.5*scalar(XI["ii"]*delta["ii"]) ; 
+
+      printf("additional contribution to Fock, 1-body energy contribution: %.15f\n", -E1B);
 
       for (int p = 0; p < norb ;p++)
       {
-        energy += density[p*norb+p]*fock[p*norb+p] ; 
+      for (int q = 0; q < norb ;q++)
+       {
+         E1B -= 2.0*density[p*norb+q]*fock[p*norb+q] ; 
+       }
       }
 
+      printf("Total 1-body energy contribution: %.15f\n", -E1B);
 
-      printf("total energy: %.15f\n", energy);
+      energy -= E1B ; 
+
+//calculation of high-frequency tail--
+     
+      U e2b_hf = 0. ;
+      CU omega ;
+      for (int w = nmax; w < 1000000 ;w++)
+      {
+        omega = {0.0,(2.0*w+1)*M_PI/beta} ;      
+      for (int p = 0; p < norb ;p++)
+      {
+        for (int q = 0; q < norb ;q++)
+        {
+         if (p==q) e2b_hf +=  2.0*(-(1.0/omega).imag()*(sigma_xx[p*norb+q]/omega).imag()) ; 
+        }
+      }
+      }
+
+     printf("high frequency tail: %.15f\n", e2b_hf/beta);
+     energy +=e2b_hf/beta ;
+
+    printf("total energy: %.15f\n", energy);
+
+    for (int p = 0; p < norb ;p++)
+      {
+        for (int q = 0; q < norb ;q++)
+        {
+         density[p*norb+q] *= 1.0 ;
+        for (int i = 0; i < norb; i++) 
+        {
+         for (int j = 0; j < norb; j++) 
+         {
+          density_ao[i*norb + j] = density_ao[i*norb + j] + c_full[p*norb+i]*c_full[q*norb+j]*density[p*norb+q] ; 
+         }  
+        }
+      }
+     }
+
+    std::ofstream dens_ao;
+    dens_ao.open("coeff.txt", ofstream::out);
+
+      for (int p = 0; p < norb ;p++)
+      {
+        for (int q = 0; q < norb ;q++)
+        {
+//          dens_ao << setprecision(10) << density_ao[p*norb + q] << std::endl ; 
+        }
+      }
+
+        dens_ao.close() ;
+
+
+
+
+
 
          vector<U> l(norb*norb);
          vector<CU> s_tmp(norb);
@@ -468,7 +612,7 @@ class CCSDSIGMA: public Task
          cout<<" #orbital occupation" <<endl ;
 
          for (int i=0 ; i < norb ; i++){
-             printf(" %.15f\n", s_tmp[i].real());
+             printf(" %.15f\n", 2.0*s_tmp[i].real());
 //            value += s_tmp[i].real();
              value += density[i*norb+i];
           }
@@ -477,6 +621,16 @@ class CCSDSIGMA: public Task
 
       return true;
    }
+
+   void calculate_density ()
+   {
+
+
+
+   }
+
+
+
   };
 
 }
