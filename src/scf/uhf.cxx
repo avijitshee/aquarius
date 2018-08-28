@@ -310,6 +310,7 @@ void UHF<T>::calcEnergy()
     this->energy() += 0.5*scalar(Db["ab"]*Fb["ab"]);
     Fa["ab"] -= H["ab"];
     Fb["ab"] -= H["ab"];
+    cout << setprecision(10) << "Nuclear Repulsion Energy" << " " << molecule.getNuclearRepulsion() << endl ;
 }
 
 template <typename T>

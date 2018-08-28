@@ -51,6 +51,10 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
             this->addProduct(Product("ccsd.eagf", "gf_ea", reqs));
+            this->addProduct(Product("ccsd.eaalpha", "alpha_ea", reqs));
+            this->addProduct(Product("ccsd.eabeta", "beta_ea", reqs));
+            this->addProduct(Product("ccsd.eagamma", "gamma_ea", reqs));
+            this->addProduct(Product("ccsd.eanorm", "norm_ea", reqs));
 
             orbital = config.get<int>("orbital");
             double from = config.get<double>("omega_min");
@@ -93,6 +97,10 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             auto& L = this->template get<DeexcitationOperator<U,2>>("L");
 
             auto& gf_ea = this-> put("gf_ea", new vector<vector<vector<vector<CU>>>>) ;
+            auto& alpha_ea = this-> put("alpha_ea", new vector<vector<U>>) ;
+            auto& beta_ea = this-> put("beta_ea", new vector<vector<U>>) ;
+            auto& gamma_ea = this-> put("gamma_ea", new vector<vector<U>>) ;
+            auto& norm_ea = this-> put("norm_ea", new vector<U>) ;
 
             SpinorbitalTensor<U> Dab("D(ab)", arena, group, {vrt,occ}, {1,0}, {1,0});
             SpinorbitalTensor<U> Gieab("G(am,ef)", arena, group, {vrt,occ}, {1,1}, {2,0});
@@ -107,6 +115,9 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
            if (orb_range == "full") 
            { orbstart = 0 ;
              orbend = nI + nA ;  
+             alpha_ea.resize(orbend*orbend) ;
+             beta_ea.resize(orbend*orbend) ;
+             gamma_ea.resize(orbend*orbend) ;
 
             gf_ea.resize(maxspin);
 
@@ -133,6 +144,9 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
            if (orb_range == "diagonal") 
            { orbstart = orbital-1 ;
              orbend = orbital;  
+             alpha_ea.resize(orbend*orbend) ;
+             beta_ea.resize(orbend*orbend) ;
+             gamma_ea.resize(orbend*orbend) ;
 
             gf_ea.resize(maxspin);
 
@@ -364,6 +378,9 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               */ 
 
               U norm = sqrt(aquarius::abs(scalar(RL*LL))); 
+
+              norm_ea.emplace_back(norm*norm) ;
+
               RL /= norm;
               LL /= norm;
 
@@ -372,6 +389,14 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               Iterative<U>::run(dag, arena);
 
               nvec_lanczos = alpha.size() ; 
+
+
+              for (int ndim = 0;ndim < orbend*orbend ;ndim++)
+             {
+              alpha_ea[ndim].resize(nvec_lanczos) ;
+              beta_ea[ndim].resize(nvec_lanczos) ;
+              gamma_ea[ndim].resize(nvec_lanczos) ;
+             }
 
   /*Define full trdiagonal matrix 
    */  
@@ -385,6 +410,12 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                  if (j==(i+1))Tdiag[i*nvec_lanczos + j] = gamma[i];
                }
               }    
+
+         for (int i=0 ; i < nvec_lanczos ; i++){
+            alpha_ea[orbleft*orbend+orbright][i] = alpha[i] ;
+            beta_ea[orbleft*orbend+orbright][i] = beta[i] ;
+            gamma_ea[orbleft*orbend+orbright][i] = gamma[i] ;
+         }
 
   /*
    * Diagonalize the tridiagonal matrix to see if that produces EOM-EA values..
@@ -421,7 +452,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               CU com_one(1.,0.) ;
               omega = {o.real(),o.imag()} ;
 
-//              this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
+//            this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
 
              for(int i=(nvec_lanczos-1);i >= 0;i--){  
               alpha_temp = {alpha[i],0.} ;

@@ -50,10 +50,11 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     {
      for (int j = 0;j < norb;j++)
      {
-       for (int k = 0;k < nalpha;k++)
-       {
-         Dalpha[i][j] += mo_coeff[k*norb+i]*mo_coeff[k*norb+j] ;
-       }
+       Dalpha[i][j] = mo_coeff[i*norb+j] ;
+//     for (int k = 0;k < nalpha;k++)
+//     {
+//       Dalpha[i][j] += mo_coeff[k*norb+i]*mo_coeff[k*norb+j] ;
+//     }
      }
     }
 
@@ -61,10 +62,11 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     {
      for (int j = 0;j < norb;j++)
      {
-       for (int k = 0;k < nbeta;k++)
-       {
-         Dbeta[i][j] += mo_coeff[k*norb+i]*mo_coeff[k*norb+j] ;
-       }
+        Dbeta[i][j] = mo_coeff[i*norb+j] ;
+//      for (int k = 0;k < nbeta;k++)
+//      {
+//        Dbeta[i][j] += mo_coeff[k*norb+i]*mo_coeff[k*norb+j] ;
+//      }
      }
     }
    }

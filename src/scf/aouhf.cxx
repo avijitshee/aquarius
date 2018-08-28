@@ -28,6 +28,7 @@ void AOUHF<T,WhichUHF>::buildFock()
 
     const vector<int>& norb = molecule.getNumOrbitals();
     int nirrep = molecule.getGroup().getNumIrreps();
+    bool coeff_exists = false ;
 
     vector<int> irrep;
     for (int i = 0;i < nirrep;i++) irrep += vector<int>(norb[i],i);
@@ -46,6 +47,8 @@ void AOUHF<T,WhichUHF>::buildFock()
     vector<vector<T>> focka(nirrep), fockb(nirrep);
     vector<vector<T>> densa(nirrep), densb(nirrep);
     vector<vector<T>> densab(nirrep);
+
+    T energy_firstiter = 0. ;
 
     for (int i = 0;i < nirrep;i++)
     {
@@ -68,6 +71,26 @@ void AOUHF<T,WhichUHF>::buildFock()
         assert(densa[i].size() == norb[i]*norb[i]);
         Db.getAllData(irreps, densb[i]);
         assert(densa[i].size() == norb[i]*norb[i]);
+
+         std::ifstream coeff("coeff.txt");
+         if (coeff)
+         {
+          densa[i].clear();
+          densb[i].clear();
+          coeff_exists = true ; 
+          std::istream_iterator<T> start(coeff), end;
+          std::vector<T> coefficient(start, end);
+          std::cout << "Read " << coefficient.size() << " numbers" << std::endl;
+          std::copy(coefficient.begin(), coefficient.end(),std::back_inserter(densa[i])); 
+         }
+  
+       if (coeff_exists) densb[i] = densa[i] ; 
+
+
+      for (int j = 0;j < norb[i]*norb[i];j++)
+      {
+        energy_firstiter  += 0.5*(focka[i][j]*densa[i][j] + fockb[i][j]*densb[i][j]) ;
+      } 
 
         densab[i] = densa[i];
         //PROFILE_FLOPS(norb[i]*norb[i]);
@@ -220,6 +243,7 @@ void AOUHF<T,WhichUHF>::buildFock()
         }
     }
 
+
     for (int i = 0;i < nirrep;i++)
     {
         vector<int> irreps(2,i);
@@ -258,6 +282,19 @@ void AOUHF<T,WhichUHF>::buildFock()
             Fb.writeRemoteData(irreps);
         }
     }
+
+    for (int i = 0;i < nirrep;i++)
+    {
+      for (int j = 0;j < norb[i]*norb[i];j++)
+      {
+        energy_firstiter  += 0.5*(focka[i][j]*densa[i][j] + fockb[i][j]*densb[i][j]) ;
+      } 
+    }
+
+    cout << "energy from 1st iteration " << endl ;
+
+    cout << setprecision(10) << energy_firstiter+molecule.getNuclearRepulsion() << endl ;
+
 }
 
 }

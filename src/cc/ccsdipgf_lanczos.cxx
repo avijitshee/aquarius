@@ -46,6 +46,10 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
             this->addProduct(Product("ccsd.ipgf", "gf_ip", reqs));
+            this->addProduct(Product("ccsd.ipalpha", "alpha_ip", reqs));
+            this->addProduct(Product("ccsd.ipbeta", "beta_ip", reqs));
+            this->addProduct(Product("ccsd.ipgamma", "gamma_ip", reqs));
+            this->addProduct(Product("ccsd.ipnorm", "norm_ip", reqs));
             orbital = config.get<int>("orbital");
             double from = config.get<double>("omega_min");
             double to = config.get<double>("omega_max");
@@ -90,6 +94,10 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             */
 
             auto& gf_ip = this-> put("gf_ip", new vector<vector<vector<vector<CU>>>>) ;
+            auto& alpha_ip = this-> put("alpha_ip", new vector<vector<U>>) ;
+            auto& beta_ip = this-> put("beta_ip", new vector<vector<U>>) ;
+            auto& gamma_ip = this-> put("gamma_ip", new vector<vector<U>>) ;
+            auto& norm_ip = this-> put("norm_ip", new vector<U>) ;
             
             SpinorbitalTensor<U> Dij("D(ij)", arena, group, {vrt,occ}, {0,1}, {0,1});
             SpinorbitalTensor<U> Gijak("G(ij,ak)", arena, group, {vrt,occ}, {0,2}, {1,1});
@@ -105,6 +113,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
            { orbstart = 0 ;
              orbend = nI + nA ;  
              gf_ip.resize(maxspin);
+             alpha_ip.resize(orbend*orbend) ;
+             beta_ip.resize(orbend*orbend) ;
+             gamma_ip.resize(orbend*orbend) ;
 
             for (int nspin = 0;nspin < maxspin;nspin++)
              {
@@ -124,12 +135,18 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              {
                gf_ip[nspin][i][j].resize(orbend);
              }
+
            } 
 
            if (orb_range == "diagonal") 
            { orbstart = orbital-1 ;
              orbend = orbital;  
              gf_ip.resize(maxspin);
+
+             alpha_ip.resize(orbend*orbend) ;
+             beta_ip.resize(orbend*orbend) ;
+             gamma_ip.resize(orbend*orbend) ;
+
             for (int nspin = 0;nspin < maxspin;nspin++)
              {
               gf_ip[nspin].resize(omegas.size());
@@ -356,19 +373,27 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               */ 
 
               U norm = sqrt(aquarius::abs(scalar(RL*LL))); 
+
+              norm_ip.emplace_back(norm*norm) ;
+
               printf("print norm: %10f\n", norm);
               RL /= norm;
               LL /= norm;
 
               Iterative<U>::run(dag, arena);
 
-              printf("print norm debug: %10f\n", norm);
-
               nvec_lanczos = alpha.size() ; 
+
+             for (int ndim = 0;ndim < orbend*orbend ;ndim++)
+             {
+              alpha_ip[ndim].resize(nvec_lanczos) ;
+              beta_ip[ndim].resize(nvec_lanczos) ;
+              gamma_ip[ndim].resize(nvec_lanczos) ;
+             }  
+
 
   /*Define full trdiagonal matrix 
    */  
-
          vector<U> Tdiag(nvec_lanczos*nvec_lanczos);
 
          for (int i=0 ; i < nvec_lanczos ; i++){
@@ -378,7 +403,13 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             if (j==(i+1))Tdiag[i*nvec_lanczos + j] = gamma[i];
           }
          }    
-            
+
+         for (int i=0 ; i < nvec_lanczos ; i++){
+            alpha_ip[orbleft*orbend+orbright][i] = alpha[i] ;
+            beta_ip[orbleft*orbend+orbright][i] = beta[i] ;
+            gamma_ip[orbleft*orbend+orbright][i] = gamma[i] ;
+         }
+ 
   /*
    * Diagonalize the tridiagonal matrix to see if that produces EOM-IP values..
    */

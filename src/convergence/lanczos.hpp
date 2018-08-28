@@ -32,7 +32,6 @@ class Lanczos : public task::Destructible
         Lanczos& operator=(const Lanczos& other);
 
     protected:
-//        typedef typename T::dtype U;
         typedef T U;
         typedef complex_type_t<U> CU;
         unique_vector<ExcitationOperator<T,1,2>> old_c_r;
