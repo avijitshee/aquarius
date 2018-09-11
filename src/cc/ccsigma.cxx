@@ -7,6 +7,7 @@
 #include "operator/excitationoperator.hpp"
 #include "hubbard/uhf_modelH.hpp"
 #include "scf/uhf.hpp"
+#include <mkl_cblas.h>
 
 using namespace aquarius::hubbard;
 using namespace aquarius::tensor;
@@ -200,6 +201,7 @@ class CCSDSIGMA: public Task
 
     vector<U> density(norb*norb,0.) ;
     vector<vector<CU>> sigma(nmax,vector<CU>(norb*norb, {0.,0.})) ;
+    vector<vector<CU>> gf_imp(nmax,vector<CU>(nr_impurities*nr_impurities, {0.,0.})) ;
     U energy = 0. ; 
  
    for (int nspin = 0;nspin < maxspin;nspin++)
@@ -251,7 +253,7 @@ class CCSDSIGMA: public Task
 
     for (int omega = 0; omega < omegas.size() ;omega++)
     {
-      vector<CU> gf_ao(nr_impurities*nr_impurities,{0.,0.}) ;
+      vector<CU> gf_imp(nr_impurities*nr_impurities,{0.,0.}) ;
       vector<CU> gf_tmp(norb*norb,{0.,0.}) ;
       vector<CU> G_inv(nr_impurities*nr_impurities) ;
 
@@ -260,8 +262,18 @@ class CCSDSIGMA: public Task
 
       calculate_total_gf(gf_ip[nspin][omega],gf_ea[nspin][omega],gf_tmp) ; 
 
+      if (nr_impurities > 0) moao_transform_gf(gf_tmp, c_full, gf_imp) ; 
+
+   /*  store impurity Green's funtion in a file
+  */
+
+
+        
+
+
+ 
    /* calculate self-energy
-    */ 
+   */ 
 
        calculate_sigma(0., omega, gf_tmp, sigma[omega]) ;
 
@@ -271,10 +283,11 @@ class CCSDSIGMA: public Task
  
     } 
    }
+
       add_density_high_frequency_tail(density) ;
 
    /* bisection starts here
-    */
+   */
 
       U thrs = 1.e-5 ;
       U mu = 0. ;
@@ -310,25 +323,24 @@ class CCSDSIGMA: public Task
 
       vector<U> density_ao(norb*norb,0.) ;
 
-//      energy *=2.0/beta ;
-
       printf("high frequency tail: %.15f\n", E2b_high_frequency(sigma[nmax-1])/beta);
-//     energy +=e2b_hf/beta ;
 
 
-    for (int p = 0; p < norb ;p++)
-      {
-        for (int q = 0; q < norb ;q++)
-        {
-        for (int i = 0; i < norb; i++) 
-        {
-         for (int j = 0; j < norb; j++) 
-         {
-          density_ao[i*norb + j] +=  c_full[p*norb+i]*c_full[q*norb+j]*density[p*norb+q] ; 
-         }  
-        }
-      }
-     }
+//     for (int p = 0; p < norb ;p++)
+//     {
+//      for (int q = 0; q < norb ;q++)
+//      {
+//      for (int i = 0; i < norb; i++) 
+//      {
+//       for (int j = 0; j < norb; j++) 
+//       {
+//        density_ao[i*norb + j] +=  c_full[p*norb+i]*c_full[q*norb+j]*density[p*norb+q] ; 
+//       }  
+//      }
+//    }
+//   }
+
+      moao_transform_gf(density, c_full, density_ao) ; 
 
       std::ofstream dens_ao;
       dens_ao.open("coeff.txt", ofstream::out);
@@ -856,12 +868,61 @@ class CCSDSIGMA: public Task
        gzero_omega.close();
    }
 
-// void transform ( A, B, C)
-// {
-//  
 
-// }  
+    void moao_transform_gf(vector<CU>& g_mo, vector<U>& c_mo, vector<CU>& g_imp)
+    {
+       vector<U> g_mo_real (norb*norb) ;
+       vector<U> g_mo_imag (norb*norb) ;
+       vector<U> g_imp_real(nr_impurities*nr_impurities, 0.) ;
+       vector<U> g_imp_imag(nr_impurities*nr_impurities, 0.) ;
 
+       vector<int> ipiv(norb,0) ;
+       getrf(norb, norb, c_mo.data(), norb, ipiv.data()) ;
+       getri(norb, c_mo.data(), norb, ipiv.data()) ;
+
+       for (int i = 0; i < norb ; i++)
+       {
+         for (int j = 0; j < norb ; j++)
+         {
+            g_mo_real [i*norb+j] = g_mo[i*norb+j].real() ; 
+            g_mo_imag [i*norb+j] = g_mo[i*norb+j].imag() ; 
+         } 
+       }
+
+       vector<U> buf(norb*nr_impurities,0.) ;
+
+       gemm('T', 'N', nr_impurities, norb, norb, 1.0, c_mo.data(), norb, g_mo_real.data(), norb, 1.0, buf.data(), nr_impurities);
+       gemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), nr_impurities, c_mo.data(), norb, 1.0, g_imp_real.data(), nr_impurities);
+
+       buf.clear() ; 
+
+       gemm('T', 'N', nr_impurities, norb, norb, 1.0, c_mo.data(), norb, g_mo_imag.data(), norb, 1.0, buf.data(), nr_impurities);
+       gemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), nr_impurities, c_mo.data(), norb, 0.0, g_imp_imag.data(), nr_impurities);
+
+      /*combine real and imaginary part to produce total complex matrix
+       */ 
+
+       for (int i = 0; i < nr_impurities ; i++)
+       {
+         for (int j = 0; j < nr_impurities ; j++)
+         {
+            g_imp [i*nr_impurities+j] = {g_imp_real[i*nr_impurities+j],g_imp_imag[i*nr_impurities+j]} ; 
+         } 
+       }
+    }
+
+    void moao_transform_gf(vector<U>& g_mo, vector<U>& c_mo, vector<U>& g_imp)
+    {
+       vector<U> buf(norb*nr_impurities,0.) ;
+
+//        cblas_dgemm(CblasRowMajor,CblasTrans, CblasNoTrans, nr_impurities, norb, norb, 1.0, c_mo.data(), nr_impurities, g_mo.data(), norb, 1.0, buf.data(), norb);
+//        cblas_dgemm(CblasRowMajor,CblasNoTrans, CblasNoTrans, nr_impurities, nr_impurities, norb, 1.0, buf.data(), norb, c_mo.data(), nr_impurities, 1.0, g_imp.data(), nr_impurities);
+
+       /* feed in fortran order
+        */
+         gemm('T', 'N', nr_impurities, norb, norb, 1.0, c_mo.data(), norb, g_mo.data(), norb, 1.0, buf.data(), norb);
+         gemm('N', 'N', nr_impurities, norb, norb, 1.0, buf.data(), nr_impurities, c_mo.data(), norb, 1.0, g_imp.data(), norb);
+    }
   };
 
 }
