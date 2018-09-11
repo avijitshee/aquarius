@@ -258,7 +258,7 @@ class CCSDSIGMA: public Task
     /* calculate total Green's function
      */ 
 
-      calculate_total_gf(gf_ip[nspin][omega],gf_ea[nspin][omega], gf_tmp) ; 
+      calculate_total_gf(gf_ip[nspin][omega],gf_ea[nspin][omega],gf_tmp) ; 
 
    /* calculate self-energy
     */ 
@@ -330,8 +330,8 @@ class CCSDSIGMA: public Task
       }
      }
 
-    std::ofstream dens_ao;
-    dens_ao.open("coeff.txt", ofstream::out);
+      std::ofstream dens_ao;
+      dens_ao.open("coeff.txt", ofstream::out);
 
       for (int p = 0; p < norb ;p++)
       {
@@ -855,6 +855,12 @@ class CCSDSIGMA: public Task
 
        gzero_omega.close();
    }
+
+// void transform ( A, B, C)
+// {
+//  
+
+// }  
 
   };
 

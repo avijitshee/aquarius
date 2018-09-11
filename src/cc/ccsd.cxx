@@ -33,6 +33,7 @@ class CCSD : public Iterative<U>
         {
             vector<Requirement> reqs;
             reqs.push_back(Requirement("moints", "H"));
+            reqs.push_back(Requirement("double", "HF_energy"));
             this->addProduct(Product("double", "mp2", reqs));
             this->addProduct(Product("double", "energy", reqs));
             this->addProduct(Product("double", "convergence", reqs));
@@ -45,6 +46,7 @@ class CCSD : public Iterative<U>
         bool run(TaskDAG& dag, const Arena& arena)
         {
             const auto& H = this->template get<TwoElectronOperator<U>>("H");
+            const auto& E_HF = this ->template get<U>("HF_energy");   
 
             const Space& occ = H.occ;
             const Space& vrt = H.vrt;
@@ -72,7 +74,7 @@ class CCSD : public Iterative<U>
             Tau["abij"]  = T(2)["abij"];
             Tau["abij"] += 0.5*T(1)["ai"]*T(1)["bj"];
 
-            double mp2 = real(scalar(H.getAI()*T(1))) + 0.25*real(scalar(H.getABIJ()*Tau));
+            double mp2 = E_HF + real(scalar(H.getAI()*T(1))) + 0.25*real(scalar(H.getABIJ()*Tau));
             Logger::log(arena) << "MP2 energy = " << setprecision(15) << mp2 << endl;
             this->put("mp2", new U(mp2));
 
@@ -83,6 +85,10 @@ class CCSD : public Iterative<U>
 
             this->put("energy", new U(this->energy()));
             this->put("convergence", new U(this->conv()));
+
+            U E_CCSD = E_HF+U(this->energy()) ;
+
+            Logger::log(arena) << "CCSD energy = " << setprecision(15) << E_CCSD << endl;
 
             /*
             if (isUsed("S2") || isUsed("multiplicity"))
