@@ -71,6 +71,18 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
              if (grid_type == "real") omegas.emplace_back(from+delta*i, eta);
              if (grid_type == "imaginary") omegas.emplace_back(0.,(2.0*i+1)*M_PI/beta);
             }
+
+            ifstream ifs("wlist_sub.txt");
+            if (ifs){
+            omegas.clear() ; 
+            string line;
+            while (getline(ifs, line))
+            {
+             U val;
+             istringstream(line) >> val;
+             omegas.emplace_back(0.,val);
+            }
+           }
         }
 
         bool run(TaskDAG& dag, const Arena& arena)
@@ -96,7 +108,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             auto& T = this->template get<ExcitationOperator  <U,2>>("T");
             auto& L = this->template get<DeexcitationOperator<U,2>>("L");
 
-            auto& gf_ea = this-> put("gf_ea", new vector<vector<vector<vector<CU>>>>) ;
+            auto& gf_ea = this-> put("gf_ea", new vector<vector<vector<CU>>>) ;
             auto& alpha_ea = this-> put("alpha_ea", new vector<vector<U>>) ;
             auto& beta_ea = this-> put("beta_ea", new vector<vector<U>>) ;
             auto& gamma_ea = this-> put("gamma_ea", new vector<vector<U>>) ;
@@ -115,11 +127,10 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
            if (orb_range == "full") 
            { orbstart = 0 ;
              orbend = nI + nA ;  
-             alpha_ea.resize(orbend*orbend) ;
-             beta_ea.resize(orbend*orbend) ;
-             gamma_ea.resize(orbend*orbend) ;
-
-            gf_ea.resize(maxspin);
+             alpha_ea.resize(orbend*(orbend+1)/2) ;
+             beta_ea.resize(orbend*(orbend+1)/2) ;
+             gamma_ea.resize(orbend*(orbend+1)/2) ;
+             gf_ea.resize(maxspin);
 
             for (int nspin = 0;nspin < maxspin;nspin++)
              {
@@ -130,23 +141,17 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
              {
               for (int i = 0;i < omegas.size();i++)
                {
-                gf_ea[nspin][i].resize(orbend);
+                gf_ea[nspin][i].resize(orbend*(orbend+1)/2);
                }
-             }
-             for (int nspin = 0;nspin < maxspin;nspin++)
-             for (int i = 0;i < omegas.size();i++)
-             for (int j = 0;j < orbend;j++)
-             {
-               gf_ea[nspin][i][j].resize(orbend);
              }
            } 
 
            if (orb_range == "diagonal") 
            { orbstart = orbital-1 ;
              orbend = orbital;  
-             alpha_ea.resize(orbend*orbend) ;
-             beta_ea.resize(orbend*orbend) ;
-             gamma_ea.resize(orbend*orbend) ;
+             alpha_ea.resize(1) ;
+             beta_ea.resize(1) ;
+             gamma_ea.resize(1) ;
 
             gf_ea.resize(maxspin);
 
@@ -162,25 +167,21 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                 gf_ea[nspin][i].resize(1);
                }
              }
-             for (int nspin = 0;nspin < maxspin;nspin++)
-             for (int i = 0;i < omegas.size();i++)
-             for (int j = 0;j < 1;j++)
-             {
-               gf_ea[nspin][i][j].resize(1);
-             }
            }
 
           vector<CU> spec_func(omegas.size()) ;
 
-
      /* start calculating all GF elements..
       */  
 
+        int uppertriangle ;
+
         for (int nspin = 0; nspin < maxspin ; nspin++)   
          {
+           uppertriangle = 0 ;
          for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   
           {
-          for (int orbright = orbstart; orbright < orbend ; orbright++)   
+          for (int orbright = orbleft; orbright < orbend ; orbright++)   
            {
             printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
 
@@ -391,7 +392,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               nvec_lanczos = alpha.size() ; 
 
 
-              for (int ndim = 0;ndim < orbend*orbend ;ndim++)
+              for (int ndim = 0;ndim < orbend*(orbend+1)/2 ;ndim++)
              {
               alpha_ea[ndim].resize(nvec_lanczos) ;
               beta_ea[ndim].resize(nvec_lanczos) ;
@@ -412,9 +413,9 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               }    
 
          for (int i=0 ; i < nvec_lanczos ; i++){
-            alpha_ea[orbleft*orbend+orbright][i] = alpha[i] ;
-            beta_ea[orbleft*orbend+orbright][i] = beta[i] ;
-            gamma_ea[orbleft*orbend+orbright][i] = gamma[i] ;
+            alpha_ea[uppertriangle][i] = alpha[i] ;
+            beta_ea[uppertriangle][i] = beta[i] ;
+            gamma_ea[uppertriangle][i] = gamma[i] ;
          }
 
   /*
@@ -432,9 +433,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             for (int i=0 ; i < nvec_lanczos ; i++){
 //            printf("real eigenvalues: %.15f\n", s_tmp[i].real());
 //            printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
-             }
+            }
 
-            U piinverse = 1.0/M_PI ;
 
             int omega_counter = 0 ;
             for (auto& o : omegas)
@@ -462,35 +462,25 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               value = (com_one)/(omega - alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
              }
-
-             if (orbright == orbleft) spec_func[omega_counter] += value*norm*norm;
-             if (orb_range == "full") gf_ea[nspin][omega_counter][orbleft][orbright] = value*norm*norm ;
-             if (orb_range == "diagonal") gf_ea[nspin][omega_counter][0][0] = value*norm*norm ;
-  //         std::ofstream gomega;
-////           gomega.open ("gomega.dat", std::ofstream::out);
-  //         gomega.open ("gomega.dat", ofstream::out|std::ios::app);
-////           gomega << o.real() << " " << -piinverse*value.imag()*norm*norm << std::endl ; 
-  //          gomega << o.real() << " " << piinverse*value.imag()*norm*norm << std::endl ; 
-  //         gomega.close();
-
-//              printf("real value : %.15f\n", value.real()*norm*norm);
-//              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
+              if (orb_range == "full") gf_ea[nspin][omega_counter][uppertriangle] = value*norm*norm ;
+              if (orb_range == "diagonal") gf_ea[nspin][omega_counter][0] = value*norm*norm ;
+              if(orbright==orbleft) spec_func[omega_counter] += value*norm*norm ;
               omega_counter += 1 ;
 
              }
+              uppertriangle +=1 ;
             }
            }
           } 
 
-            U piinverse = 1/M_PI ;
-            std::ofstream gomega;
-            gomega.open ("gomega_ea.dat", ofstream::out|std::ios::app);
+             std::ofstream gomega;
+             gomega.open ("gomega_ea.dat", ofstream::out|std::ios::app);
 
-            for (int i=0 ; i < omegas.size() ; i++){
-//               gomega << omegas[i].real() << " " <<(-1/M_PI)*spec_func[i].imag() << std::endl ; 
-            }
+             for (int i=0 ; i < omegas.size() ; i++){
+               gomega << omegas[i].real() << " " << -1/M_PI*spec_func[i].imag() << std::endl ;
+             }
 
-            gomega.close();
+             gomega.close();
 
             return true;
         }
@@ -569,11 +559,16 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
 static const char* spec = R"(
 
-orbital int,
-npoint int,
-omega_min double,
-omega_max double,
-eta double,
+orbital ?
+int 1,
+npoint ?
+int 100,
+omega_min ?
+double -10.0,
+omega_max ?
+double 10.0,
+eta ?
+double .001,
 grid?
   enum{ real, imaginary },
 orbital_range?

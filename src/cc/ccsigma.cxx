@@ -6,6 +6,7 @@
 #include "operator/st2eoperator.hpp"
 #include "operator/excitationoperator.hpp"
 #include "hubbard/uhf_modelH.hpp"
+#include "AIM/uhf_modelH.hpp"
 #include "scf/uhf.hpp"
 #include <mkl_cblas.h>
 
@@ -38,6 +39,7 @@ class CCSDSIGMA: public Task
         int ni ; 
         int nA ;
         int na ;
+        string grid_type ;
         vector<U> integral_diagonal ;
         vector<U> v_onsite ;
         vector<U> fock;
@@ -70,11 +72,11 @@ class CCSDSIGMA: public Task
 
             double from = config.get<double>("omega_min");
             double to = config.get<double>("omega_max");
-            nmax = config.get<double>("frequency_points");
+            nmax = config.get<double>("npoint");
             double eta = config.get<double>("eta");
             nr_impurities = config.get<int>("impurities"); 
             beta = config.get<double>("beta");
-            string grid_type = config.get<string>("grid");
+            grid_type = config.get<string>("grid");
             string gf_string = config.get<string>("gftype");  
 
             double delta = (to-from)/max(1,nmax-1);
@@ -84,11 +86,23 @@ class CCSDSIGMA: public Task
                if (grid_type == "real") omegas.emplace_back(from+delta*i, eta);
             }
 
+            ifstream ifs("wlist_sub.txt");
+            if (ifs){
+            omegas.clear() ; 
+            string line;
+            while (getline(ifs, line))
+            {
+             U val;
+             istringstream(line) >> val;
+             omegas.emplace_back(0.,val);
+            }
+           }
+
             if (gf_string == "symmetrized") gf_type = 1 ;
             if (gf_string == "nonsymmetrized") gf_type = 2 ;
          } 
 
-
+           
 //       inline U f_tau(U tau, U beta, U c1, U c2, U c3){
 //          return -0.5*c1 + (c2*0.25)*(-beta+2.*tau) + (c3*0.25)*(beta*tau-tau*tau);
 //       }
@@ -106,8 +120,8 @@ class CCSDSIGMA: public Task
         bool run(TaskDAG& dag, const Arena& arena)
         {
          int nirreps = 1;
-         auto& gf_ea = this->template get<vector<vector<vector<vector<CU>>>>>("gf_ea");
-         auto& gf_ip = this->template get<vector<vector<vector<vector<CU>>>>>("gf_ip");
+         auto& gf_ea = this->template get<vector<vector<vector<CU>>>>("gf_ea");
+         auto& gf_ip = this->template get<vector<vector<vector<CU>>>>("gf_ip");
 
          const auto& occ = this->template get<MOSpace<U>>("occ");
          const auto& vrt = this->template get<MOSpace<U>>("vrt");
@@ -139,7 +153,7 @@ class CCSDSIGMA: public Task
  
          int maxspin = (nI == ni) ? 1 : 2 ;
 
-//         int norb = N[0]; 
+//       int norb = N[0]; 
          norb = nI+nA; 
  
          for (int i = 0;i < nirreps;i++)
@@ -160,8 +174,16 @@ class CCSDSIGMA: public Task
        vector<U> fockvv;
        vector<U> fockov;
 
- /* remove all self-energy and total Green's function files those are already there in the directory..
-  */  
+       std::ifstream gfile("gf_total.txt");
+       if (gfile) remove("gf_total.txt");
+
+       std::ifstream specfile("spectral_fn.txt");
+       if (specfile) remove("spectral_fn.txt");
+
+       U piinverse = 1.0/M_PI ;
+
+/* remove all self-energy and total Green's function files those are already there in the directory..
+ */  
        for (int nspin = 0; nspin < maxspin ; nspin++)   
        { 
         for (int i = 0;i < nr_impurities;i++)
@@ -186,8 +208,8 @@ class CCSDSIGMA: public Task
         } 
        }
 
- /* Reading one electron integrals here. It will be nicer to read them separately within a function.. 
-  */   
+/* Reading one electron integrals here. It will be nicer to read them separately within a function.. 
+ */   
 
        std::ifstream one_diag("one_diag.txt");
        std::istream_iterator<U> start(one_diag), end;
@@ -225,31 +247,22 @@ class CCSDSIGMA: public Task
 
       fock.resize(norb*norb) ;
 
-    for (int i = 0;i < nirreps;i++)
-    {
-//    (nspin == 0) ? fock.assign(Ea[i].begin(), Ea[i].end()) : fock.assign(Eb[i].begin(), Eb[i].end());
-//      (nspin == 0) ? Fa({i,i}).getAllData(fock) : Fb({i,i}).getAllData(fock);
-//        (nspin == 0) ? FMI({i,i}).getAllData(fockoo) : FMI({i,i}).getAllData(fockoo);
-//        (nspin == 0) ? FME({i,i}).getAllData(fockov) : FME({i,i}).getAllData(fockov);
-//        (nspin == 0) ? FAE({i,i}).getAllData(fockvv) : FAE({i,i}).getAllData(fockvv);
-    }
+      FMI({nspin,0},{0,nspin})({0,0}).getAllData(fockoo); 
+      FME({0,nspin},{nspin,0}).getAllData({0,0},fockov);
+      FAE({nspin,0},{nspin,0}).getAllData({0,0},fockvv);
 
-           FMI({nspin,0},{0,nspin})({0,0}).getAllData(fockoo); 
-           FME({0,nspin},{nspin,0}).getAllData({0,0},fockov);
-           FAE({nspin,0},{nspin,0}).getAllData({0,0},fockvv);
+      int nocc = (nspin == 0 ? occ.nalpha[0] : occ.nbeta[0]) ;
+      int nvirt = (nspin == 0 ? vrt.nalpha[0] : vrt.nbeta[0]) ;
 
-           int nocc = (nspin == 0 ? occ.nalpha[0] : occ.nbeta[0]) ;
-           int nvirt = (nspin == 0 ? vrt.nalpha[0] : vrt.nbeta[0]) ;
-
-           for (int i=0 ; i < norb ; i++){
-            for (int j=0 ; j < norb ; j++){
-             if ((i < nocc) && (j < nocc)) fock[i*norb+j] = fockoo[i*nocc+j] ; 
-             if ((i < nocc) && (j >= nocc)) fock[i*norb+j] = fockov[i*nvirt+(j-nocc)] ; 
-//           if ((i >= nocc) && (j < nocc)) fock[i*norb+j] = 1.0*fockov[(i-nocc)*nocc+j] ; 
-             if ((i >= nocc) && (j >= nocc)) fock[i*norb+j] = fockvv[(i-nocc)*nvirt+(j-nocc)] ; 
-             fock[j*norb+i] = fock[i*norb+j] ;
-            }
-           } 
+      for (int i=0 ; i < norb ; i++){
+       for (int j=0 ; j < norb ; j++){
+        if ((i < nocc) && (j < nocc)) fock[i*norb+j] = fockoo[i*nocc+j] ; 
+        if ((i < nocc) && (j >= nocc)) fock[i*norb+j] = fockov[i*nvirt+(j-nocc)] ; 
+//      if ((i >= nocc) && (j < nocc)) fock[i*norb+j] = 1.0*fockov[(i-nocc)*nocc+j] ; 
+        if ((i >= nocc) && (j >= nocc)) fock[i*norb+j] = fockvv[(i-nocc)*nvirt+(j-nocc)] ; 
+        fock[j*norb+i] = fock[i*norb+j] ;
+       }
+      } 
 
     for (int omega = 0; omega < omegas.size() ;omega++)
     {
@@ -260,31 +273,53 @@ class CCSDSIGMA: public Task
     /* calculate total Green's function
      */ 
 
-      calculate_total_gf(gf_ip[nspin][omega],gf_ea[nspin][omega],gf_tmp) ; 
+      recalculate_gf(0., omega, gf_tmp) ;
 
-      if (nr_impurities > 0) moao_transform_gf(gf_tmp, c_full, gf_imp) ; 
+//      calculate_total_gf(gf_ip[nspin][omega],gf_ea[nspin][omega],gf_tmp) ; 
+
+     if (nr_impurities > 0)
+     {
+       moao_transform_gf(gf_tmp, c_full, gf_imp) ; 
 
    /*  store impurity Green's funtion in a file
   */
+      for (int i = 0; i < nr_impurities ; i++){
+         for (int j = 0; j < nr_impurities ; j++){
+	      std::ofstream gomega;
+	      gomega.open ("gf_total.txt", ofstream::out|std::ios::app);
+	      gomega << setprecision(12) << gf_imp[i*nr_impurities+j] << std::endl ; 
+	      gomega.close();
+         }
+      }
+     }
 
+    /* spectral function to a file
+    */
 
-        
+     if (grid_type == "real")
+     {
+        for (int i = 0; i < nr_impurities ; i++){
+          for (int j = 0; j < nr_impurities ; j++){
+	      std::ofstream gomega;
+	      gomega.open ("spectral_fn.txt", ofstream::out|std::ios::app);
+	      gomega << setprecision(12) << omegas[omega].real() << " " << -piinverse*gf_imp[i*nr_impurities+j].imag() << std::endl ; 
+	      gomega.close();
+            }
+           }
+     }
 
-
- 
    /* calculate self-energy
    */ 
-
        calculate_sigma(0., omega, gf_tmp, sigma[omega]) ;
 
        energy += E2b(sigma[omega],gf_tmp) ;
 
        calculate_density(omega,gf_tmp,density) ;
- 
     } 
    }
-
       add_density_high_frequency_tail(density) ;
+
+      printf("Tr(Sigma.G) energy: %.15f\n", (2.0/beta)*energy);
 
    /* bisection starts here
    */
@@ -325,35 +360,20 @@ class CCSDSIGMA: public Task
 
       printf("high frequency tail: %.15f\n", E2b_high_frequency(sigma[nmax-1])/beta);
 
-
-//     for (int p = 0; p < norb ;p++)
-//     {
-//      for (int q = 0; q < norb ;q++)
-//      {
-//      for (int i = 0; i < norb; i++) 
-//      {
-//       for (int j = 0; j < norb; j++) 
-//       {
-//        density_ao[i*norb + j] +=  c_full[p*norb+i]*c_full[q*norb+j]*density[p*norb+q] ; 
-//       }  
-//      }
-//    }
-//   }
-
       moao_transform_gf(density, c_full, density_ao) ; 
 
-      std::ofstream dens_ao;
-      dens_ao.open("coeff.txt", ofstream::out);
+//      std::ofstream dens_ao;
+//      dens_ao.open("coeff.txt", ofstream::out);
 
       for (int p = 0; p < norb ;p++)
       {
         for (int q = 0; q < norb ;q++)
         {
-          dens_ao << setprecision(10) << density_ao[p*norb + q] << std::endl ; 
+//          dens_ao << setprecision(10) << density_ao[p*norb + q] << std::endl ; 
         }
       }
 
-        dens_ao.close() ;
+//        dens_ao.close() ;
 
          vector<U> l(norb*norb);
          vector<CU> s_tmp(norb);
@@ -362,6 +382,7 @@ class CCSDSIGMA: public Task
          int info_ener = geev('N', 'V', norb, fock.data(), norb,
                      s_tmp.data(), l.data(), norb,
                      vr_tmp.data(), norb);
+
          if (info_ener != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info_ener));
 
          cout<<" #orbital energies" <<endl ;
@@ -370,25 +391,24 @@ class CCSDSIGMA: public Task
              printf(" %.15f\n", s_tmp[i].real());
           }
 
-         l.clear() ;
-         s_tmp.clear();
-         vr_tmp.clear();
+//       l.clear() ;
+//       s_tmp.clear();
+//       vr_tmp.clear();
 
-         U value = 0. ; 
-         int info = geev('N', 'V', norb, density.data(), norb,
-                     s_tmp.data(), l.data(), norb,
-                     vr_tmp.data(), norb);
-         if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
+//       U value = 0. ; 
+//       int info = geev('N', 'V', norb, density.data(), norb,
+//                   s_tmp.data(), l.data(), norb,
+//                   vr_tmp.data(), norb);
+//       if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
 
-         cout<<" #orbital occupation" <<endl ;
+//       cout<<" #orbital occupation" <<endl ;
 
-         for (int i=0 ; i < norb ; i++){
-             printf(" %.15f\n", 2.0*s_tmp[i].real());
-//            value += s_tmp[i].real();
-             value += density[i*norb+i];
-          }
+//       for (int i=0 ; i < norb ; i++){
+//           printf(" %.15f\n", 2.0*s_tmp[i].real());
+//           value += density[i*norb+i];
+//        }
 
-         printf("total occupancy: %.15f\n", value);
+//       printf("total occupancy: %.15f\n", value);
 
       return true;
    }
@@ -430,9 +450,9 @@ class CCSDSIGMA: public Task
      return value ;
     }
 
-    void recalculate_gf(U mu, int omega, vector<CU> &gf,  vector<CU> &sigma)
+    void recalculate_gf(U mu, int omega, vector<CU> &gf,  const vector<CU> &sigma)
     {
-      vector<int> ipiv(norb) ;
+      vector<int> ipiv(norb*norb*3) ;
 
       for (int i = 0 ; i < norb*norb ; i++)
       {
@@ -453,8 +473,8 @@ class CCSDSIGMA: public Task
     void recalculate_gf(U mu, int omega, vector<CU> &gf)
     {
 
-      vector<vector<CU>> gf_ip_temp(norb, vector<CU>(norb)) ;
-      vector<vector<CU>> gf_ea_temp(norb, vector<CU>(norb)) ;
+      vector<CU> gf_ip_temp(norb*(norb+1)/2) ;
+      vector<CU> gf_ea_temp(norb*(norb+1)/2) ;
 
       continued_fraction_ip (mu, omega, gf_ip_temp) ; 
 
@@ -465,7 +485,7 @@ class CCSDSIGMA: public Task
     } 
 
 
-    void continued_fraction_ip (U mu, int omega, vector<vector<CU>> &gf)  
+    void continued_fraction_ip (U mu, int omega, vector<CU> &gf)  
     {
 
          auto& alpha_ip = this->template get<vector<vector<U>>>("alpha_ip");
@@ -483,26 +503,26 @@ class CCSDSIGMA: public Task
 
          for (int p = 0; p < norb ;p++)
          {
-          for (int q = 0; q < norb ;q++)
+          for (int q = p; q < norb ;q++)
           {
               value  = {0.,0.} ;
               value1 = {0.,0.} ;
 
              for(int i=(nvec_lanczos-1);i >= 0;i--){  
-              alpha_temp = {alpha_ip[p*norb+q][i],0.} ;
-              beta_temp  = {beta_ip[p*norb+q][i],0.} ;
-              gamma_temp = {gamma_ip[p*norb+q][i],0.} ;
+              alpha_temp = {alpha_ip[(p*norb+q)-p*(p+1)/2][i],0.} ;
+              beta_temp  = {beta_ip[(p*norb+q)-p*(p+1)/2][i],0.} ;
+              gamma_temp = {gamma_ip[(p*norb+q)-p*(p+1)/2][i],0.} ;
 
               value = (com_one)/(omegas[omega] + mu + alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
              }
-              gf[p][q] = value*norm_ip[p*norb+q]  ;
+              gf[(p*norb+q)-p*(p+1)/2] = value*norm_ip[(p*norb+q)-p*(p+1)/2]  ;
           }
          }
 
     }
 
-    void continued_fraction_ea (U mu, int omega, vector<vector<CU>> &gf)  
+    void continued_fraction_ea (U mu, int omega, vector<CU> &gf)  
     {
 
          auto& alpha_ea = this->template get<vector<vector<U>>>("alpha_ea");
@@ -526,14 +546,14 @@ class CCSDSIGMA: public Task
               value1 = {0.,0.} ;
 
              for(int i=(nvec_lanczos-1);i >= 0;i--){  
-              alpha_temp = {alpha_ea[p*norb+q][i],0.} ;
-              beta_temp  = {beta_ea[p*norb+q][i],0.} ;
-              gamma_temp = {gamma_ea[p*norb+q][i],0.} ;
+              alpha_temp = {alpha_ea[(p*norb+q)-p*(p+1)/2][i],0.} ;
+              beta_temp  = {beta_ea[(p*norb+q)-p*(p+1)/2][i],0.} ;
+              gamma_temp = {gamma_ea[(p*norb+q)-p*(p+1)/2][i],0.} ;
 
               value = (com_one)/(omegas[omega] + mu - alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;   
               }
-              gf[p][q] = value*norm_ea[p*norb+q] ;
+              gf[(p*norb+q)-p*(p+1)/2] = value*norm_ea[(p*norb+q)-p*(p+1)/2] ;
           }
          }
     }
@@ -576,23 +596,25 @@ class CCSDSIGMA: public Task
       } 
     }
 
-   void calculate_total_gf(vector<vector<CU>> &gf_ip_temp, vector<vector<CU>> &gf_ea_temp, vector<CU> &gf_total) 
+   void calculate_total_gf(vector<CU> &gf_ip_temp, vector<CU> &gf_ea_temp, vector<CU> &gf_total) 
     {
      if (gf_type == 1)
      {
       for (int p = 0; p < norb ;p++)
       {
-        for (int q = 0; q < norb ;q++)
+        for (int q = p; q < norb ;q++)
         {
          if (q == p)
           {
-           gf_total[p*norb+q] = gf_ip_temp[p][q] + gf_ea_temp[p][q] ; 
+           gf_total[p*norb+q] = gf_ip_temp[(p*norb+q)-p*(p+1)/2] + gf_ea_temp[(p*norb+q)-p*(p+1)/2] ; 
           }
           else
           { 
-            gf_total[p*norb+q]  = 0.5*( gf_ip_temp[p][q] - gf_ip_temp[p][p] - gf_ip_temp[q][q]) ; 
-            gf_total[p*norb+q] += 0.5*( gf_ea_temp[p][q] - gf_ea_temp[p][p] - gf_ea_temp[q][q]) ; 
+            gf_total[p*norb+q]  = 0.5*( gf_ip_temp[(p*norb+q)-p*(p+1)/2] - gf_ip_temp[(p*norb+p)-p*(p+1)/2] - gf_ip_temp[(q*norb+q)-q*(q+1)/2]) ; 
+            gf_total[p*norb+q] += 0.5*( gf_ea_temp[(p*norb+q)-p*(p+1)/2] - gf_ea_temp[(p*norb+p)-p*(p+1)/2] - gf_ea_temp[(q*norb+q)-q*(q+1)/2]) ; 
           }
+// symmetrize gf_total   
+            gf_total[q*norb+p] = gf_total[p*norb+q] ; 
         }
       } 
      }
@@ -602,7 +624,8 @@ class CCSDSIGMA: public Task
       {
         for (int q = 0; q < norb ;q++)
         {
-          gf_total[p*norb+q] = gf_ip_temp[p][q] + gf_ea_temp[p][q] ; 
+          gf_total[p*norb+q] = gf_ip_temp[(p*norb+q)-p*(p+1)/2] + gf_ea_temp[(p*norb+q)-p*(p+1)/2] ; 
+          gf_total[q*norb+p] = gf_total[p*norb+q] ; 
         }
       } 
      }
@@ -629,8 +652,8 @@ class CCSDSIGMA: public Task
 
      for (int omega = 0; omega < nmax ; omega++)
      {  
- //     recalculate_gf(mu, omega, gf[omega], sigma[omega]) ;
-      recalculate_gf(mu, omega, gf[omega]) ;
+        recalculate_gf(mu, omega, gf[omega], sigma[omega]) ;
+  //     recalculate_gf(mu, omega, gf[omega]) ;
     
       calculate_density(omega,gf[omega],density) ;
      }
@@ -848,7 +871,7 @@ class CCSDSIGMA: public Task
      {
      for (int v = 0; v < nr_impurities; v++)
       {
-       CU Hybridization{0.,0.} ;
+        CU Hybridization{0.,0.} ;
        for (int b = nr_impurities; b < norb; b++)
        {
         Hybridization += (integral_diagonal[u*norb+b]*integral_diagonal[v*norb+b])/(omegas[omega] - integral_diagonal[b*norb+b]) ;
@@ -864,7 +887,6 @@ class CCSDSIGMA: public Task
          gzero_omega << omegas[omega].imag() << " " << u << " " << v << " " << G_inv[u*nr_impurities+v].real() << " " << G_inv[u*nr_impurities+v].imag() << std::endl ; 
       }
      }
-
        gzero_omega.close();
    }
 
@@ -891,13 +913,13 @@ class CCSDSIGMA: public Task
 
        vector<U> buf(norb*nr_impurities,0.) ;
 
-       gemm('T', 'N', nr_impurities, norb, norb, 1.0, c_mo.data(), norb, g_mo_real.data(), norb, 1.0, buf.data(), nr_impurities);
-       gemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), nr_impurities, c_mo.data(), norb, 1.0, g_imp_real.data(), nr_impurities);
+        gemm('T', 'N', nr_impurities, norb, norb, 1.0, c_mo.data(), norb, g_mo_real.data(), norb, 1.0, buf.data(), nr_impurities);
+        gemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), nr_impurities, c_mo.data(), norb, 1.0, g_imp_real.data(), nr_impurities);
 
        buf.clear() ; 
 
-       gemm('T', 'N', nr_impurities, norb, norb, 1.0, c_mo.data(), norb, g_mo_imag.data(), norb, 1.0, buf.data(), nr_impurities);
-       gemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), nr_impurities, c_mo.data(), norb, 0.0, g_imp_imag.data(), nr_impurities);
+        gemm('T', 'N', nr_impurities, norb, norb, 1.0, c_mo.data(), norb, g_mo_imag.data(), norb, 0.0, buf.data(), nr_impurities);
+        gemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), nr_impurities, c_mo.data(), norb, 1.0, g_imp_imag.data(), nr_impurities);
 
       /*combine real and imaginary part to produce total complex matrix
        */ 
@@ -913,15 +935,15 @@ class CCSDSIGMA: public Task
 
     void moao_transform_gf(vector<U>& g_mo, vector<U>& c_mo, vector<U>& g_imp)
     {
-       vector<U> buf(norb*nr_impurities,0.) ;
+         vector<U> buf(norb*norb,0.) ;
 
 //        cblas_dgemm(CblasRowMajor,CblasTrans, CblasNoTrans, nr_impurities, norb, norb, 1.0, c_mo.data(), nr_impurities, g_mo.data(), norb, 1.0, buf.data(), norb);
 //        cblas_dgemm(CblasRowMajor,CblasNoTrans, CblasNoTrans, nr_impurities, nr_impurities, norb, 1.0, buf.data(), norb, c_mo.data(), nr_impurities, 1.0, g_imp.data(), nr_impurities);
 
        /* feed in fortran order
         */
-         gemm('T', 'N', nr_impurities, norb, norb, 1.0, c_mo.data(), norb, g_mo.data(), norb, 1.0, buf.data(), norb);
-         gemm('N', 'N', nr_impurities, norb, norb, 1.0, buf.data(), nr_impurities, c_mo.data(), norb, 1.0, g_imp.data(), norb);
+         gemm('T', 'N', norb, norb, norb, 1.0, c_mo.data(), norb, g_mo.data(), norb, 1.0, buf.data(), norb);
+         gemm('N', 'N', norb, norb, norb, 1.0, buf.data(), norb, c_mo.data(), norb, 1.0, g_imp.data(), norb);
     }
   };
 
@@ -930,11 +952,15 @@ class CCSDSIGMA: public Task
 
 static const char* spec = R"(
 
-    frequency_points int,
-    omega_min double,
-    omega_max double,
-    impurities int,
-    eta double,
+    npoint int,
+    omega_min double ?
+    double -10.0,
+    omega_max double ?
+    double 10.0,
+    impurities ?
+    int 1,
+    eta ?
+    double .001,
     beta double, 
     grid?
         enum{ imaginary, real },

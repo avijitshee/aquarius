@@ -540,7 +540,6 @@ void uhf_modelh<T>::buildFock()
    *fockb = (densa+densb)*v_onsite - densb*v_onsite 
    */
      
-//      string path="filename";  
       ifstream ifs(path);
       string line;
 

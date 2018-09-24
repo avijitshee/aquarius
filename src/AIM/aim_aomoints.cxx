@@ -41,38 +41,13 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     auto& Fa = this->template get<SymmetryBlockedTensor<U>>("Fa");
     auto& Fb = this->template get<SymmetryBlockedTensor<U>>("Fb");
 
-    vector<vector<U>> cA(nirreps), ca(nirreps), cI(nirreps), ci(nirreps), FA(nirreps), FB(nirreps);
-
     const vector<int>& N = occ.nao;
     const vector<int>& nI = occ.nalpha;
     const vector<int>& ni = occ.nbeta;
     const vector<int>& nA = vrt.nalpha;
     const vector<int>& na = vrt.nbeta;
 
-    norb = N[0]; 
-
-    for (int i = 0;i < nirreps;i++)
-    {
-        vector<int> irreps = {i,i};
-        cA_.getAllData(irreps, cA[i]);
-        assert(cA[i].size() == N[i]*nA[i]);
-        ca_.getAllData(irreps, ca[i]);
-        assert(ca[i].size() == N[i]*na[i]);
-        cI_.getAllData(irreps, cI[i]);
-        assert(cI[i].size() == N[i]*nI[i]);
-        ci_.getAllData(irreps, ci[i]);
-        assert(ci[i].size() == N[i]*ni[i]);
-        Fa.getAllData(irreps, FA[i]);
-        Fb.getAllData(irreps, FB[i]);
-    }
-
-    vector<vector<U>> E(norb,vector<U>(norb));
-
-   /*In the following we define the one-electronic AO/site integrals for aim model..
-    */ 
-
     Space orb(PointGroup::C1(), N, N);
-
 
   /* Read two-electron integrals from an external file and put them in a symmetry-packed array 
    */
@@ -87,12 +62,11 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     int countline = 0 ;
     while (getline(ifs, line))
     {
-       double val;
+       U val;
        int p, q, k, l;
        istringstream(line) >> p >> q >> k >> l >> val;
-
+       countline = ((p*N[0]+k)*N[0]+q)*N[0]+l ;
        ijklpairs.emplace_back(countline,val);
-       countline++ ;
     }
 
     X.writeRemoteData({0,0,0,0},ijklpairs);
@@ -105,6 +79,7 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     CTFTensor<U>& VAIBJ = H.getAIBJ()({1,0},{1,0})({0,0,0,0});
     CTFTensor<U>& VABCI = H.getABCI()({1,0},{1,0})({0,0,0,0});
     CTFTensor<U>& VABCD = H.getABCD()({1,0},{1,0})({0,0,0,0});
+
 
      {
          CTFTensor<U> tmp("tmp", arena, 4, {nA[0],N[0],N[0],N[0]}, {NS,NS,NS,NS});
@@ -126,13 +101,23 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
          VABCI["ABCI"] =   tmp2["ABCS"]*cI_({0,0})["SI"];
      }
 
+//   {
+//       CTFTensor<U> tmp("tmp", arena, 4, {nA[0],N[0],N[0],N[0]}, {NS,NS,NS,NS});
+//       tmp["AQRS"] = X({0,0,0,0})["PQRS"]*cA_({0,0})["PA"];
+//       CTFTensor<U> tmp1("tmp1", arena, 4, {nA[0],nA[0],N[0],N[0]}, {NS,NS,NS,NS});
+//       tmp1["AbRS"] =   tmp["AQRS"]*ca_({0,0})["Qb"];
+//       CTFTensor<U> tmp2("tmp2", arena, 4, {nA[0],nA[0],nI[0],N[0]}, {NS,NS,NS,NS});
+//       tmp2["AbIS"] = tmp1["ABRS"]*cI_({0,0})["RI"];
+//       VABIJ["AbIj"] =   tmp2["ABIS"]*ci_({0,0})["Sj"];
+//   }
+
      {
          CTFTensor<U> tmp("tmp", arena, 4, {nA[0],N[0],N[0],N[0]}, {NS,NS,NS,NS});
-           tmp["AQRS"] = X({0,0,0,0})["PQRS"]*cA_({0,0})["PA"];
+         tmp["AQRS"] = X({0,0,0,0})["PQRS"]*cA_({0,0})["PA"];
          CTFTensor<U> tmp1("tmp1", arena, 4, {nA[0],nA[0],N[0],N[0]}, {NS,NS,NS,NS});
          tmp1["ABRS"] =   tmp["AQRS"]*cA_({0,0})["QB"];
          CTFTensor<U> tmp2("tmp2", arena, 4, {nA[0],nA[0],nI[0],N[0]}, {NS,NS,NS,NS});
-           tmp2["ABIS"] = tmp1["ABRS"]*cI_({0,0})["RI"];
+         tmp2["ABIS"] = tmp1["ABRS"]*cI_({0,0})["RI"];
          VABIJ["ABIJ"] =   tmp2["ABIS"]*cI_({0,0})["SJ"];
      }
 
@@ -173,8 +158,9 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     H.getABCI()({1,0},{0,1})["AbcI"]  =    -H.getABCI()({1,0},{1,0})["bAcI"];
     H.getABCI()({0,0},{0,0})["abci"]  =     H.getABCI()({1,0},{1,0})["abci"];
 
-    H.getABIJ()({2,0},{0,2})["ABIJ"]  = 0.5*H.getABIJ()({1,0},{0,1})["ABIJ"];
-    H.getABIJ()({0,0},{0,0})["abij"]  = 0.5*H.getABIJ()({1,0},{0,1})["abij"];
+
+     H.getABIJ()({2,0},{0,2})["ABIJ"]  = 0.5*H.getABIJ()({1,0},{0,1})["ABIJ"];
+     H.getABIJ()({0,0},{0,0})["abij"]  = 0.5*H.getABIJ()({1,0},{0,1})["abij"];
 
     H.getAIBJ()({1,1},{1,1})["AIBJ"]  =     H.getAIBJ()({1,0},{1,0})["AIBJ"];
     H.getAIBJ()({1,1},{1,1})["AIBJ"] -=     H.getABIJ()({1,0},{0,1})["ABJI"];

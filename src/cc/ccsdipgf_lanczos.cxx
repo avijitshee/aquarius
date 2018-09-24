@@ -65,6 +65,18 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              if (grid_type == "real") omegas.emplace_back(from+delta*i, eta);
              if (grid_type == "imaginary") omegas.emplace_back(0.,(2.0*i+1)*M_PI/beta);
             }
+
+            ifstream ifs("wlist_sub.txt");
+            if (ifs){
+            omegas.clear() ; 
+            string line;
+            while (getline(ifs, line))
+            {
+             U val;
+             istringstream(line) >> val;
+             omegas.emplace_back(0.,val);
+            }
+           }
         }
 
         bool run(TaskDAG& dag, const Arena& arena)
@@ -93,7 +105,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
            /* vector LL means Left Lanczos and RL means Right Lanczos
             */
 
-            auto& gf_ip = this-> put("gf_ip", new vector<vector<vector<vector<CU>>>>) ;
+            auto& gf_ip = this-> put("gf_ip", new vector<vector<vector<CU>>>) ;
             auto& alpha_ip = this-> put("alpha_ip", new vector<vector<U>>) ;
             auto& beta_ip = this-> put("beta_ip", new vector<vector<U>>) ;
             auto& gamma_ip = this-> put("gamma_ip", new vector<vector<U>>) ;
@@ -113,9 +125,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
            { orbstart = 0 ;
              orbend = nI + nA ;  
              gf_ip.resize(maxspin);
-             alpha_ip.resize(orbend*orbend) ;
-             beta_ip.resize(orbend*orbend) ;
-             gamma_ip.resize(orbend*orbend) ;
+             alpha_ip.resize(orbend*(orbend+1)/2) ;
+             beta_ip.resize(orbend*(orbend+1)/2) ;
+             gamma_ip.resize(orbend*(orbend+1)/2) ;
 
             for (int nspin = 0;nspin < maxspin;nspin++)
              {
@@ -126,16 +138,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              {
               for (int i = 0;i < omegas.size();i++)
                {
-                gf_ip[nspin][i].resize(orbend);
+                gf_ip[nspin][i].resize(orbend*(orbend+1)/2);
                }
              }
-             for (int nspin = 0;nspin < maxspin;nspin++)
-             for (int i = 0;i < omegas.size();i++)
-             for (int j = 0;j < orbend;j++)
-             {
-               gf_ip[nspin][i][j].resize(orbend);
-             }
-
            } 
 
            if (orb_range == "diagonal") 
@@ -143,9 +148,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              orbend = orbital;  
              gf_ip.resize(maxspin);
 
-             alpha_ip.resize(orbend*orbend) ;
-             beta_ip.resize(orbend*orbend) ;
-             gamma_ip.resize(orbend*orbend) ;
+             alpha_ip.resize(1) ;
+             beta_ip.resize(1) ;
+             gamma_ip.resize(1) ;
 
             for (int nspin = 0;nspin < maxspin;nspin++)
              {
@@ -158,25 +163,24 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                 gf_ip[nspin][i].resize(1);
                }
              }
-             for (int nspin = 0;nspin < maxspin;nspin++)
-             for (int i = 0;i < omegas.size();i++)
-             for (int j = 0;j < 1;j++)
-             {
-               gf_ip[nspin][i][j].resize(1);
-             }
-           } 
+           }
 
-          vector<CU> spec_func(omegas.size()) ;
+        vector<CU> spec_func(omegas.size()) ;
+
+        int uppertriangle ;
 
         for (int nspin = 0; nspin < maxspin ; nspin++)   
          {
+
+         uppertriangle = 0 ;
+
          for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   
           {
-           for (int orbright = orbstart; orbright < orbend ; orbright++)   
+           for (int orbright = orbleft; orbright < orbend ; orbright++)   
             {
               old_value.clear() ;             
 
-            printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
+              printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
 
             bool isalpha_right = false;
             bool isvrt_right = false;
@@ -384,13 +388,12 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
               nvec_lanczos = alpha.size() ; 
 
-             for (int ndim = 0;ndim < orbend*orbend ;ndim++)
+             for (int ndim = 0;ndim < orbend*(orbend+1)/2 ;ndim++)
              {
               alpha_ip[ndim].resize(nvec_lanczos) ;
               beta_ip[ndim].resize(nvec_lanczos) ;
               gamma_ip[ndim].resize(nvec_lanczos) ;
              }  
-
 
   /*Define full trdiagonal matrix 
    */  
@@ -405,15 +408,14 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
          }    
 
          for (int i=0 ; i < nvec_lanczos ; i++){
-            alpha_ip[orbleft*orbend+orbright][i] = alpha[i] ;
-            beta_ip[orbleft*orbend+orbright][i] = beta[i] ;
-            gamma_ip[orbleft*orbend+orbright][i] = gamma[i] ;
+            alpha_ip[uppertriangle][i] = alpha[i] ;
+            beta_ip[uppertriangle][i] = beta[i] ;
+            gamma_ip[uppertriangle][i] = gamma[i] ;
          }
  
   /*
    * Diagonalize the tridiagonal matrix to see if that produces EOM-IP values..
    */
-
             vector<U> l(nvec_lanczos*nvec_lanczos);
             vector<CU> s_tmp(nvec_lanczos);
             vector<U> vr_tmp(nvec_lanczos*nvec_lanczos);
@@ -428,8 +430,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 //              printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
              }
 
-             std::ifstream iffile("gomega_ip.dat");
-             if (iffile) remove("gomega_ip.dat");
+            std::ifstream iffile("gomega_ip.dat");
+            if (iffile) remove("gomega_ip.dat");
 
             U piinverse = 1/M_PI ;
 
@@ -461,24 +463,23 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               value1 = value ;
              }
 
-             if(orbright==orbleft) spec_func[omega_counter] += value*norm*norm;
+             if (orb_range == "full") gf_ip[nspin][omega_counter][uppertriangle] = value*norm*norm ;
+             if (orb_range == "diagonal") gf_ip[nspin][omega_counter][0] = value*norm*norm ;
 
-             if (orb_range == "full") gf_ip[nspin][omega_counter][orbleft][orbright] = value*norm*norm ;
-             if (orb_range == "diagonal") gf_ip[nspin][omega_counter][0][0] = value*norm*norm ;
+             if(orbright==orbleft) spec_func[omega_counter] += value*norm*norm ;
 
-//              printf("real value : %.15f\n", value.real()*norm*norm);
-//              printf("imaginary value : %.15f\n", value.imag()*norm*norm);
               omega_counter += 1 ;
              }
+             uppertriangle +=1 ;
           }
         }
        }
-             U piinverse = 1/M_PI ;
-             std::ofstream gomega;
-               gomega.open ("gomega_ip.dat", ofstream::out|std::ios::app);
 
-            for (int i=0 ; i < omegas.size() ; i++){
-               gomega << omegas[i].real() << " " << -1/M_PI*spec_func[i].imag() << std::endl ; 
+             std::ofstream gomega;
+             gomega.open ("gomega_ip.dat", ofstream::out|std::ios::app);
+
+             for (int i=0 ; i < omegas.size() ; i++){
+               gomega << omegas[i].real() << " " << -1/M_PI*spec_func[i].imag() << std::endl ;
              }
 
              gomega.close();
@@ -554,7 +555,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                 Y(2)["ija"] -=     WAMEI["eiam"]*LL(2)["mje"];
                 Y(2)["ija"]  +=       FME[  "ia"]*LL(1)[  "j"];
             
-            lanczos.extrapolate_tridiagonal(RL, LL, Z, Y, D, alpha, beta, gamma);
+              lanczos.extrapolate_tridiagonal(RL, LL, Z, Y, D, alpha, beta, gamma);
 
               value  = 1. ;
               value1 = 0. ;
@@ -577,7 +578,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               else{
                 delta_value = old_value[nvec_lanczos-2] - value ;
               }
-
               this->conv() = max(pow(beta[beta.size()-1],2), pow(gamma[gamma.size()-1],2));
 //            this->conv() = aquarius::abs(delta_value) ;
 
@@ -589,11 +589,16 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
 static const char* spec = R"(
 
-orbital int,
-npoint int,
-omega_min double,
-omega_max double,
-eta double,
+orbital ?
+int 1,
+npoint ?
+int 100,
+omega_min ?
+double -10.0,
+omega_max ?
+double 10.0,
+eta ?
+double .001,
 grid?
   enum{ real, imaginary },
 orbital_range?
