@@ -293,7 +293,7 @@ class CCSDSIGMA: public Task
       }
      }
 
-    /* spectral function to a file
+   /* spectral function to a file
     */
 
      if (grid_type == "real")
@@ -302,10 +302,10 @@ class CCSDSIGMA: public Task
           for (int j = 0; j < nr_impurities ; j++){
 	      std::ofstream gomega;
 	      gomega.open ("spectral_fn.txt", ofstream::out|std::ios::app);
-	      gomega << setprecision(12) << omegas[omega].real() << " " << -piinverse*gf_imp[i*nr_impurities+j].imag() << std::endl ; 
+	      gomega << setprecision(12) << omegas[omega].real() << " " << gf_imp[i*nr_impurities+j].real() << " "  << -piinverse*gf_imp[i*nr_impurities+j].imag() << std::endl ; 
 	      gomega.close();
-            }
-           }
+          }
+        }
      }
 
    /* calculate self-energy
@@ -653,7 +653,7 @@ class CCSDSIGMA: public Task
      for (int omega = 0; omega < nmax ; omega++)
      {  
         recalculate_gf(mu, omega, gf[omega], sigma[omega]) ;
-  //     recalculate_gf(mu, omega, gf[omega]) ;
+ //     recalculate_gf(mu, omega, gf[omega]) ;
     
       calculate_density(omega,gf[omega],density) ;
      }
@@ -893,14 +893,22 @@ class CCSDSIGMA: public Task
 
     void moao_transform_gf(vector<CU>& g_mo, vector<U>& c_mo, vector<CU>& g_imp)
     {
-       vector<U> g_mo_real (norb*norb) ;
-       vector<U> g_mo_imag (norb*norb) ;
+       vector<U> g_mo_real (norb*norb, 0.) ;
+       vector<U> g_mo_imag (norb*norb,0.) ;
        vector<U> g_imp_real(nr_impurities*nr_impurities, 0.) ;
        vector<U> g_imp_imag(nr_impurities*nr_impurities, 0.) ;
+       vector<U> c_small(nr_impurities*norb, 0.) ;
 
-       vector<int> ipiv(norb,0) ;
-       getrf(norb, norb, c_mo.data(), norb, ipiv.data()) ;
-       getri(norb, c_mo.data(), norb, ipiv.data()) ;
+   /*  Extract in Row major  a section of c_mo array
+    */
+
+       for (int i = 0; i < norb ; i++)
+       {
+         for (int j = 0; j < nr_impurities ; j++)
+         {
+            c_small [i*nr_impurities+j] = c_mo[i*norb+j] ; 
+         } 
+       }
 
        for (int i = 0; i < norb ; i++)
        {
@@ -911,18 +919,18 @@ class CCSDSIGMA: public Task
          } 
        }
 
-       vector<U> buf(norb*nr_impurities,0.) ;
+        vector<U> buf(norb*nr_impurities,0.) ;
 
-        gemm('T', 'N', nr_impurities, norb, norb, 1.0, c_mo.data(), norb, g_mo_real.data(), norb, 1.0, buf.data(), nr_impurities);
-        gemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), nr_impurities, c_mo.data(), norb, 1.0, g_imp_real.data(), nr_impurities);
+        cblas_dgemm(CblasRowMajor,CblasTrans, CblasNoTrans, nr_impurities, norb, norb, 1.0, c_small.data(), nr_impurities, g_mo_real.data(), norb, 0.0, buf.data(), norb);
+        cblas_dgemm(CblasRowMajor,CblasNoTrans, CblasNoTrans, nr_impurities, nr_impurities, norb, 1.0, buf.data(), norb, c_small.data(), nr_impurities, 1.0, g_imp_real.data(), nr_impurities);
 
-       buf.clear() ; 
+        buf.clear() ; 
 
-        gemm('T', 'N', nr_impurities, norb, norb, 1.0, c_mo.data(), norb, g_mo_imag.data(), norb, 0.0, buf.data(), nr_impurities);
-        gemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), nr_impurities, c_mo.data(), norb, 1.0, g_imp_imag.data(), nr_impurities);
+        cblas_dgemm(CblasRowMajor,CblasTrans, CblasNoTrans, nr_impurities, norb, norb, 1.0, c_small.data(), nr_impurities, g_mo_imag.data(), norb, 0.0, buf.data(), norb);
+        cblas_dgemm(CblasRowMajor,CblasNoTrans, CblasNoTrans, nr_impurities, nr_impurities, norb, 1.0, buf.data(), norb, c_small.data(), nr_impurities, 1.0, g_imp_imag.data(), nr_impurities);
 
-      /*combine real and imaginary part to produce total complex matrix
-       */ 
+    /*combine real and imaginary part to produce total complex matrix
+     */ 
 
        for (int i = 0; i < nr_impurities ; i++)
        {
@@ -931,6 +939,7 @@ class CCSDSIGMA: public Task
             g_imp [i*nr_impurities+j] = {g_imp_real[i*nr_impurities+j],g_imp_imag[i*nr_impurities+j]} ; 
          } 
        }
+
     }
 
     void moao_transform_gf(vector<U>& g_mo, vector<U>& c_mo, vector<U>& g_imp)
