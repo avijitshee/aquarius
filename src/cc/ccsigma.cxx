@@ -189,7 +189,7 @@ class CCSDSIGMA: public Task
         for (int i = 0;i < nr_impurities;i++)
         { 
           std::stringstream stream;
-          stream << "gomega_"<<nspin<<"_"<<i<< ".txt";
+          stream << "spectral_fn_"<<nspin<<"_"<<i<< ".txt";
           std::string fileName = stream.str();
           std::ifstream gfile(fileName.c_str());
           if (gfile) remove(fileName.c_str());
@@ -275,14 +275,15 @@ class CCSDSIGMA: public Task
 
       recalculate_gf(0., omega, gf_tmp) ;
 
-//      calculate_total_gf(gf_ip[nspin][omega],gf_ea[nspin][omega],gf_tmp) ; 
+//    calculate_total_gf(gf_ip[nspin][omega],gf_ea[nspin][omega],gf_tmp) ; 
 
-     if (nr_impurities > 0)
-     {
+    if (nr_impurities > 0)
+    {
        moao_transform_gf(gf_tmp, c_full, gf_imp) ; 
 
    /*  store impurity Green's funtion in a file
-  */
+    */
+
       for (int i = 0; i < nr_impurities ; i++){
          for (int j = 0; j < nr_impurities ; j++){
 	      std::ofstream gomega;
@@ -291,7 +292,6 @@ class CCSDSIGMA: public Task
 	      gomega.close();
          }
       }
-     }
 
    /* spectral function to a file
     */
@@ -299,17 +299,19 @@ class CCSDSIGMA: public Task
      if (grid_type == "real")
      {
         for (int i = 0; i < nr_impurities ; i++){
-          for (int j = 0; j < nr_impurities ; j++){
-	      std::ofstream gomega;
-	      gomega.open ("spectral_fn.txt", ofstream::out|std::ios::app);
-	      gomega << setprecision(12) << omegas[omega].real() << " " << gf_imp[i*nr_impurities+j].real() << " "  << -piinverse*gf_imp[i*nr_impurities+j].imag() << std::endl ; 
-	      gomega.close();
-          }
+          std::stringstream stream;
+           stream << "spectral_fn_"<<nspin<<"_"<<i<< ".txt";
+           std::string fileName = stream.str();
+          std::ofstream gspec;
+           gspec.open (fileName.c_str(), ofstream::out|std::ios::app);
+           gspec << omegas[omega].real() << " " << -piinverse*gf_imp[i*nr_impurities+i].imag() << std::endl ;
+          gspec.close();
         }
      }
+    }
 
    /* calculate self-energy
-   */ 
+    */ 
        calculate_sigma(0., omega, gf_tmp, sigma[omega]) ;
 
        energy += E2b(sigma[omega],gf_tmp) ;
@@ -322,7 +324,7 @@ class CCSDSIGMA: public Task
       printf("Tr(Sigma.G) energy: %.15f\n", (2.0/beta)*energy);
 
    /* bisection starts here
-   */
+    */
 
       U thrs = 1.e-5 ;
       U mu = 0. ;
@@ -391,24 +393,24 @@ class CCSDSIGMA: public Task
              printf(" %.15f\n", s_tmp[i].real());
           }
 
-//       l.clear() ;
-//       s_tmp.clear();
-//       vr_tmp.clear();
+         l.clear() ;
+         s_tmp.clear();
+         vr_tmp.clear();
 
-//       U value = 0. ; 
-//       int info = geev('N', 'V', norb, density.data(), norb,
-//                   s_tmp.data(), l.data(), norb,
-//                   vr_tmp.data(), norb);
-//       if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
+         U value = 0. ; 
+         int info = geev('N', 'V', norb, density.data(), norb,
+                     s_tmp.data(), l.data(), norb,
+                     vr_tmp.data(), norb);
+         if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
 
-//       cout<<" #orbital occupation" <<endl ;
+         cout<<" #orbital occupation" <<endl ;
 
-//       for (int i=0 ; i < norb ; i++){
-//           printf(" %.15f\n", 2.0*s_tmp[i].real());
-//           value += density[i*norb+i];
-//        }
+         for (int i=0 ; i < norb ; i++){
+             printf(" %.15f\n", 2.0*s_tmp[i].real());
+             value += density[i*norb+i];
+          }
 
-//       printf("total occupancy: %.15f\n", value);
+         printf("total occupancy: %.15f\n", value);
 
       return true;
    }
@@ -652,8 +654,8 @@ class CCSDSIGMA: public Task
 
      for (int omega = 0; omega < nmax ; omega++)
      {  
-        recalculate_gf(mu, omega, gf[omega], sigma[omega]) ;
- //     recalculate_gf(mu, omega, gf[omega]) ;
+ //   recalculate_gf(mu, omega, gf[omega], sigma[omega]) ;
+      recalculate_gf(mu, omega, gf[omega]) ;
     
       calculate_density(omega,gf[omega],density) ;
      }
