@@ -42,7 +42,7 @@ class CCSDEAGF : public Iterative<complex_type_t<U>>
             reqs.emplace_back("ccsd.T", "T");
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
-            this->addProduct("ccsd.ipgf", "gf_ea", reqs);
+            this->addProduct("ccsd.eagf", "gf_ea", reqs);
 
             orbital = config.get<int>("orbital");
             double from = config.get<double>("omega_min");
@@ -133,7 +133,7 @@ class CCSDEAGF : public Iterative<complex_type_t<U>>
              }
              for (int nspin = 0;nspin < maxspin;nspin++)
              for (int i = 0;i < omegas.size();i++)
-             for (int j = 0;j < orbend;j++)
+             for (int j = 0;j < 1;j++)
              {
                gf_ea[nspin][i][j].resize(1);
              }

@@ -8,7 +8,7 @@ using namespace aquarius::symmetry;
 
 namespace aquarius
 {
-namespace hubbard
+namespace aim
 {
 
 template <typename U>
@@ -16,31 +16,30 @@ ReadInts<U>::ReadInts(const string& name, input::Config& config)
 : Task(name, config)
 {
     vector<Requirement> reqs;
-    reqs.emplace_back("hubbard","hubbard"); 
+    reqs.emplace_back("aim","aim"); 
     addProduct("Da", "Da", reqs);
     addProduct("Db", "Db", reqs);
-    addProduct("hubbard_1eints", "H", reqs);
-    addProduct("hubbard_S", "S", reqs);
+    addProduct("aim_1eints", "H", reqs);
+    addProduct("aim_S", "S", reqs);
 }
 
 template <typename U>
 bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
 {
-    auto& hubbard =this->template get<Hubbard <U>>("hubbard");
+    auto& aim =this->template get<AIM <U>>("aim");
 
     vector<int> alpha_array ;
     vector<int> beta_array ;
-    int norb = hubbard.getNumOrbitals() ;
-    int nalpha = hubbard.getNumAlphaElectrons() ;
-    int nbeta = hubbard.getNumBetaElectrons() ;
-    int ndoc = hubbard.getDoccOrbitals() ;
+    int norb = aim.getNumOrbitals() ;
+    int nalpha = aim.getNumAlphaElectrons() ;
+    int nbeta = aim.getNumBetaElectrons() ;
+    int ndoc = aim.getDoccOrbitals() ;
 
     vector<vector<double>> E(norb,vector<double>(norb));
     vector<vector<double>> Dalpha(norb,vector<double>(norb));
     vector<vector<double>> Dbeta(norb,vector<double>(norb));
 
     read_1e_integrals() ; 
-    read_2e_integrals() ; 
     read_coeff() ;	
 
 
@@ -79,13 +78,6 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
      }
     }
 
-    for (int i = 0;i < norb;i++)
-    {
-       E[i][i] -= v_onsite[i]/2.0   ;
-
-       printf("orbital energies: %d, %f\n", i, E[i][i]) ;
-    }
-
     auto& H =  this->put("H", new SymmetryBlockedTensor<U>("Fa", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
     auto& Da = this->put("Da", new SymmetryBlockedTensor<U>("Da", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
     auto& Db = this->put("Db", new SymmetryBlockedTensor<U>("Db", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
@@ -101,8 +93,8 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
         ov_pairs.emplace_back(i*norb+i, 1);
     }
 
-    hubbard.alphastring_to_vector(alpha_array) ;
-    hubbard.betastring_to_vector(beta_array) ;
+    aim.alphastring_to_vector(alpha_array) ;
+    aim.betastring_to_vector(beta_array) ;
 
    if (coeff_exists) 
    {
@@ -173,5 +165,5 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
 }
 }
 
-INSTANTIATE_SPECIALIZATIONS(aquarius::hubbard::ReadInts);
-REGISTER_TASK(aquarius::hubbard::ReadInts<double>,"read_integrals");
+INSTANTIATE_SPECIALIZATIONS(aquarius::aim::ReadInts);
+REGISTER_TASK(aquarius::aim::ReadInts<double>,"read_aim_integrals");

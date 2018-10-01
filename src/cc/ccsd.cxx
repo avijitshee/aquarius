@@ -33,6 +33,7 @@ class CCSD : public Iterative<U>
         {
             vector<Requirement> reqs;
             reqs.push_back(Requirement("moints", "H"));
+            reqs.push_back(Requirement("double", "HF_energy"));
             this->addProduct(Product("double", "mp2", reqs));
             this->addProduct(Product("double", "energy", reqs));
             this->addProduct(Product("double", "convergence", reqs));
@@ -45,6 +46,7 @@ class CCSD : public Iterative<U>
         bool run(TaskDAG& dag, const Arena& arena)
         {
             const auto& H = this->template get<TwoElectronOperator<U>>("H");
+            const auto& E_HF = this ->template get<U>("HF_energy");   
 
             const Space& occ = H.occ;
             const Space& vrt = H.vrt;
@@ -72,7 +74,7 @@ class CCSD : public Iterative<U>
             Tau["abij"]  = T(2)["abij"];
             Tau["abij"] += 0.5*T(1)["ai"]*T(1)["bj"];
 
-            double mp2 = real(scalar(H.getAI()*T(1))) + 0.25*real(scalar(H.getABIJ()*Tau));
+            double mp2 = E_HF + real(scalar(H.getAI()*T(1))) + 0.25*real(scalar(H.getABIJ()*Tau));
             Logger::log(arena) << "MP2 energy = " << setprecision(15) << mp2 << endl;
             this->put("mp2", new U(mp2));
 
@@ -83,6 +85,10 @@ class CCSD : public Iterative<U>
 
             this->put("energy", new U(this->energy()));
             this->put("convergence", new U(this->conv()));
+
+            U E_CCSD = E_HF+U(this->energy()) ;
+
+            Logger::log(arena) << "CCSD energy = " << setprecision(15) << E_CCSD << endl;
 
             /*
             if (isUsed("S2") || isUsed("multiplicity"))
@@ -133,42 +139,6 @@ class CCSD : public Iterative<U>
             auto& WMNEJ = this->template gettmp<SpinorbitalTensor<U>>("WMNEJ");
             auto& WAMIJ = this->template gettmp<SpinorbitalTensor<U>>("WAMIJ");
             auto& WAMEI = this->template gettmp<SpinorbitalTensor<U>>("WAMEI");
-
-
-            SpinorbitalTensor<double> Delta("Delta", arena, H.getIJKL().getGroup(), {H.occ,H.occ}, {0,2}, {0,2});
-
-            int x = 0 ;
-
-            vector<tkv_pair<U>> pairsa;
-
-            for (int i = 0;i < H.occ.nalpha[0] ;i++)
-            { 
-            for (int j = 0;j < H.occ.nalpha[0] ;j++)
-             {
-             for (int k = 0;k < H.occ.nalpha[0] ;k++)
-              {
-              for (int l = 0;l < H.occ.nalpha[0] ;l++)
-               {
-
-                 pairsa.emplace_back(x, 0.0) ;
-
-               if ((k == i) && (l == j))  pairsa.emplace_back(x, 1.0);
-                x += 1 ; 
-
-               }
-              }
-             }
-            }
-
-           vector<U> temp ;
-     
-            Delta({0,0},{0,0})({0,0,0,0}).writeRemoteData(pairsa);
-            Delta({0,2},{0,2})({0,0,0,0}).writeRemoteData(pairsa);
-            Delta({0,1},{0,1})({0,0,0,0}).writeRemoteData(pairsa);
-
-            pairsa.clear() ;
-
-            fMI({0,0},{0,0})({0,0}).getAllData(temp) ;
 
             Tau["abij"]  = T(2)["abij"];
             Tau["abij"] += 0.5*T(1)["ai"]*T(1)["bj"];
@@ -239,11 +209,6 @@ class CCSD : public Iterative<U>
             this->energy() = real(scalar(H.getAI()*T(1))) + 0.25*real(scalar(H.getABIJ()*Tau));
             this->conv() = Z.norm(00);
 
-//            printf("print HF energy: %.15f\n",real(scalar(H.getIJ())) + real(scalar(H.getIJKL())));
-//            printf("print HF energy: %.15f\n", real(scalar(H.getIJKL()*H.getIJKL())));
-            printf("print HF energy: %.15f\n", 2.0*sum(temp) - 0.25*real(scalar(H.getIJKL()*Delta)));
-
-            temp.clear() ;
             diis.extrapolate(T, Z);
         }
 

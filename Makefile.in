@@ -163,6 +163,11 @@ am____top_builddir__bin_aquarius_SOURCES_DIST = src/autocc/autocc.cxx \
 	src/hubbard/read_integrals.cxx  \
 	src/hubbard/hubbard_aomoints.cxx \
 	src/hubbard/hubbard_moints.cxx \
+        src/AIM/aim.cxx  \
+	src/AIM/uhf_modelH.cxx  \
+	src/AIM/read_integrals.cxx  \
+	src/AIM/aim_aomoints.cxx \
+	src/AIM/aim_moints.cxx \
         src/main/main.cxx \
 	src/operator/2eoperator.cxx src/operator/aomoints.cxx \
 	src/operator/fakemoints.cxx src/operator/rhfaomoints.cxx \
@@ -236,6 +241,11 @@ am___top_builddir__bin_aquarius_OBJECTS = src/autocc/autocc.$(OBJEXT) \
 	src/hubbard/read_integrals.$(OBJEXT) \
 	src/hubbard/hubbard_aomoints.$(OBJEXT) \
 	src/hubbard/hubbard_moints.$(OBJEXT) \
+	src/AIM/aim.$(OBJEXT) \
+	src/AIM/uhf_modelH.$(OBJEXT) \
+	src/AIM/read_integrals.$(OBJEXT) \
+	src/AIM/aim_aomoints.$(OBJEXT) \
+	src/AIM/aim_moints.$(OBJEXT) \
 	src/operator/2eoperator.$(OBJEXT) \
 	src/operator/aomoints.$(OBJEXT) \
 	src/operator/fakemoints.$(OBJEXT) \
@@ -495,6 +505,10 @@ __top_builddir__bin_aquarius_SOURCES = src/autocc/autocc.cxx \
 	src/hubbard/hubbard_aomoints.cxx \
 	src/hubbard/hubbard_moints.cxx \
 	src/hubbard/read_integrals.cxx \
+        src/AIM/aim.cxx src/AIM/uhf_modelH.cxx \
+	src/AIM/aim_aomoints.cxx \
+	src/AIM/aim_moints.cxx \
+	src/AIM/read_integrals.cxx \
 	src/operator/2eoperator.cxx src/operator/aomoints.cxx \
 	src/operator/fakemoints.cxx src/operator/rhfaomoints.cxx \
 	src/operator/moints.cxx src/operator/sparseaomoints.cxx \
@@ -830,6 +844,22 @@ src/hubbard/hubbard_moints.$(OBJEXT): src/hubbard/$(am__dirstamp) \
 	src/hubbard/$(DEPDIR)/$(am__dirstamp)
 src/hubbard/read_integrals.$(OBJEXT): src/hubbard/$(am__dirstamp) \
 	src/hubbard/$(DEPDIR)/$(am__dirstamp)
+src/AIM/$(am__dirstamp):
+	@$(MKDIR_P) src/AIM
+	@: > src/AIM/$(am__dirstamp)
+src/AIM/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) src/AIM/$(DEPDIR)
+	@: > src/AIM/$(DEPDIR)/$(am__dirstamp)
+src/AIM/aim.$(OBJEXT): src/AIM/$(am__dirstamp) \
+	src/AIM/$(DEPDIR)/$(am__dirstamp)
+src/AIM/uhf_modelH.$(OBJEXT): src/AIM/$(am__dirstamp) \
+	src/AIM/$(DEPDIR)/$(am__dirstamp)
+src/AIM/aim_aomoints.$(OBJEXT): src/AIM/$(am__dirstamp) \
+	src/AIM/$(DEPDIR)/$(am__dirstamp)
+src/AIM/aim_moints.$(OBJEXT): src/AIM/$(am__dirstamp) \
+	src/AIM/$(DEPDIR)/$(am__dirstamp)
+src/AIM/read_integrals.$(OBJEXT): src/AIM/$(am__dirstamp) \
+	src/AIM/$(DEPDIR)/$(am__dirstamp)
 src/main/$(am__dirstamp):
 	@$(MKDIR_P) src/main
 	@: > src/main/$(am__dirstamp)
@@ -943,6 +973,7 @@ mostlyclean-compile:
 	-rm -f src/integrals/*.$(OBJEXT)
 	-rm -f src/jellium/*.$(OBJEXT)
 	-rm -f src/hubbard/*.$(OBJEXT)
+	-rm -f src/AIM/*.$(OBJEXT)
 	-rm -f src/main/*.$(OBJEXT)
 	-rm -f src/operator/*.$(OBJEXT)
 	-rm -f src/scf/*.$(OBJEXT)
@@ -1051,6 +1082,11 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@src/hubbard/$(DEPDIR)/hubbard_aomoints.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/hubbard/$(DEPDIR)/hubbard_moints.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/hubbard/$(DEPDIR)/read_integrals.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src/AIM/$(DEPDIR)/aim.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src/AIM/$(DEPDIR)/uhf_modelH.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src/AIM/$(DEPDIR)/aim_aomoints.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src/AIM/$(DEPDIR)/aim_moints.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src/AIM/$(DEPDIR)/read_integrals.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/main/$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/operator/$(DEPDIR)/2eoperator.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/operator/$(DEPDIR)/aomoints.Po@am__quote@
@@ -1356,6 +1392,8 @@ distclean-generic:
 	-rm -f src/jellium/$(am__dirstamp)
 	-rm -f src/hubbard/$(DEPDIR)/$(am__dirstamp)
 	-rm -f src/hubbard/$(am__dirstamp)
+	-rm -f src/AIM/$(DEPDIR)/$(am__dirstamp)
+	-rm -f src/AIM/$(am__dirstamp)
 	-rm -f src/main/$(DEPDIR)/$(am__dirstamp)
 	-rm -f src/main/$(am__dirstamp)
 	-rm -f src/operator/$(DEPDIR)/$(am__dirstamp)
@@ -1431,7 +1469,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf src/autocc/$(DEPDIR) src/cc/$(DEPDIR) src/input/$(DEPDIR) src/integrals/$(DEPDIR) src/jellium/$(DEPDIR) src/hubbard/$(DEPDIR) src/main/$(DEPDIR) src/operator/$(DEPDIR) src/scf/$(DEPDIR) src/symmetry/$(DEPDIR) src/task/$(DEPDIR) src/tensor/$(DEPDIR) src/time/$(DEPDIR) src/util/$(DEPDIR)
+	-rm -rf src/autocc/$(DEPDIR) src/cc/$(DEPDIR) src/input/$(DEPDIR) src/integrals/$(DEPDIR) src/jellium/$(DEPDIR) src/hubbard/$(DEPDIR) src/AIM/$(DEPDIR) src/main/$(DEPDIR) src/operator/$(DEPDIR) src/scf/$(DEPDIR) src/symmetry/$(DEPDIR) src/task/$(DEPDIR) src/tensor/$(DEPDIR) src/time/$(DEPDIR) src/util/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

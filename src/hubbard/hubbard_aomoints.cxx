@@ -19,7 +19,7 @@ Hubbard_AOMOints<U>::Hubbard_AOMOints(const string& name, Config& config)
 : Hubbard_MOIntegrals<U>(name, config)
 {
 //    this->getProduct("H").addRequirement("eri", "I"); //this line has to be modified
-  int nelec = 12 ;
+    int nirreps = 1 ;
 }
 
 template <typename U>
@@ -50,9 +50,9 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     const vector<int>& nA = vrt.nalpha;
     const vector<int>& na = vrt.nbeta;
 
-    int norb = N[0]; 
+    norb = N[0]; 
 
-     printf("Print number of alpha and beta orbitals: %d %d %d\n ",norb, nI[0],ni[0]);
+    printf("Print number of alpha and beta orbitals: %d %d %d\n ",norb, nI[0],ni[0]);
 
     for (int i = 0;i < nirreps;i++)
     {
@@ -218,8 +218,6 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
 // H.getAIBJ()({0,0},{0,0})["aibj"] -=     H.getABIJ()({1,0},{0,1})["abji"];
 // H.getAIBJ()({1,1},{1,1})["AIBJ"] -=     H.getABIJ()({1,0},{0,1})["ABJI"];
 
-    printf("Print number of alpha and final debug: %d %d\n ",nI[0],ni[0]);
-
     /*
      * Fill in pieces which are equal by Hermiticity
      */
@@ -254,8 +252,6 @@ void Hubbard_AOMOints<U>::writeIntegrals(vector<U>& cfirst, vector<U>& csecond, 
 {
     vector<tkv_pair<U>> pairs;
     tensor.getLocalData({0,0,0,0}, pairs);
-
-    int norb = 12;
 
     read_2e_integrals() ; 
 

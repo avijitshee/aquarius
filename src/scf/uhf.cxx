@@ -22,7 +22,7 @@ UHF<T>::UHF(const string& name, Config& config)
     reqs += Requirement("molecule", "molecule");
     reqs += Requirement("ovi", "S");
     reqs += Requirement("1ehamiltonian", "H");
-    this->addProduct(Product("double", "energy", reqs));
+    this->addProduct(Product("double", "HF_energy", reqs));
     this->addProduct(Product("double", "convergence", reqs));
     this->addProduct(Product("double", "S2", reqs));
     this->addProduct(Product("double", "multiplicity", reqs));
@@ -85,7 +85,7 @@ bool UHF<T>::run(TaskDAG& dag, const Arena& arena)
         calcS2();
     }
 
-    this->put("energy", new T(this->energy()));
+    this->put("HF_energy", new T(this->energy()));
     this->put("convergence", new T(this->conv()));
 
     int nfrozen = 0;
@@ -310,6 +310,7 @@ void UHF<T>::calcEnergy()
     this->energy() += 0.5*scalar(Db["ab"]*Fb["ab"]);
     Fa["ab"] -= H["ab"];
     Fb["ab"] -= H["ab"];
+    cout << setprecision(10) << "Nuclear Repulsion Energy" << " " << molecule.getNuclearRepulsion() << endl ;
 }
 
 template <typename T>

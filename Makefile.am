@@ -98,6 +98,12 @@ __top_builddir__bin_aquarius_SOURCES = \
 	src/hubbard/hubbard_aomoints.cxx \
 	src/hubbard/hubbard_moints.cxx \
 	\
+        src/AIM/aim.cxx \
+	src/AIM/read_integrals.cxx \
+	src/AIM/uhf_modelH.cxx \
+	src/AIM/aim_aomoints.cxx \
+	src/AIM/aim_moints.cxx \
+	\
 	src/main/main.cxx \
 	\
 	src/operator/2eoperator.cxx \

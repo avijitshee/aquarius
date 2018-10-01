@@ -1,5 +1,5 @@
 #include "uhf_modelH.hpp"
-#include "hubbard.hpp"
+#include "aim.hpp"
 #include "util/global.hpp"
 
 using namespace aquarius::input;
@@ -12,17 +12,17 @@ using namespace aquarius::symmetry;
 
 namespace aquarius
 {
-namespace hubbard
+namespace aim
 {
 template <typename T>
 uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
 : Iterative<T>(name, config), frozen_core(config.get<bool>("frozen_core")),
-  diis(config.get("diis"), 2)
+  path(config.get<string>("filename")), diis(config.get("diis"), 2)
 {
     vector<Requirement> reqs;
-    reqs += Requirement("hubbard", "hubbard");
-    reqs += Requirement("hubbard_S", "S");
-    reqs += Requirement("hubbard_1eints", "H");
+    reqs += Requirement("aim", "aim");
+    reqs += Requirement("aim_S", "S");
+    reqs += Requirement("aim_1eints", "H");
     reqs += Requirement("Da", "Da");
     reqs += Requirement("Db", "Db");
     this->addProduct(Product("double", "energy", reqs));
@@ -40,11 +40,11 @@ uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
 template <typename T>
 bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
-   int norb = hubbard.getNumOrbitals();
-   int nalpha = hubbard.getNumAlphaElectrons();
-   int nbeta = hubbard.getNumBetaElectrons();
-   int nirreps = hubbard.getNumIrreps() ;
+   auto& aim =this->template get<AIM <T>>("aim");
+   int norb = aim.getNumOrbitals();
+   int nalpha = aim.getNumAlphaElectrons();
+   int nbeta = aim.getNumBetaElectrons();
+   int nirreps = aim.getNumIrreps() ;
 
    vector<int> shapeNN = {NS,NS};
    vector<vector<int>> sizenn  = {{norb},{norb}};
@@ -182,11 +182,11 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 template <typename T>
 void uhf_modelh<T>::iterate(const Arena& arena)
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
-   int norb = hubbard.getNumOrbitals();
-   int nalpha = hubbard.getNumAlphaElectrons();
-   int nbeta = hubbard.getNumBetaElectrons();
-   int nirreps = hubbard.getNumIrreps() ;
+   auto& aim =this->template get<AIM <T>>("aim");
+   int norb = aim.getNumOrbitals();
+   int nalpha = aim.getNumAlphaElectrons();
+   int nbeta = aim.getNumBetaElectrons();
+   int nirreps = aim.getNumIrreps() ;
 
     buildFock();
     DIISExtrap();
@@ -246,11 +246,11 @@ void uhf_modelh<T>::iterate(const Arena& arena)
 template <typename T>
 void uhf_modelh<T>::calcSMinusHalf()
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
-   const int norb = hubbard.getNumOrbitals();
-   int nalpha = hubbard.getNumAlphaElectrons();
-   int nbeta = hubbard.getNumBetaElectrons();
-   int nirreps = hubbard.getNumIrreps() ;
+   auto& aim =this->template get<AIM <T>>("aim");
+   const int norb = aim.getNumOrbitals();
+   int nalpha = aim.getNumAlphaElectrons();
+   int nbeta = aim.getNumBetaElectrons();
+   int nirreps = aim.getNumIrreps() ;
 
     auto& S = this->template get<SymmetryBlockedTensor<T>>("S");
     auto& Smhalf = this->template gettmp<SymmetryBlockedTensor<T>>("S^-1/2");
@@ -310,11 +310,11 @@ void uhf_modelh<T>::calcSMinusHalf()
 template <typename T>
 void uhf_modelh<T>::diagonalizeFock()
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
-   const int norb = hubbard.getNumOrbitals();
-   int nalpha = hubbard.getNumAlphaElectrons();
-   int nbeta = hubbard.getNumBetaElectrons();
-   int nirreps = hubbard.getNumIrreps() ;
+   auto& aim =this->template get<AIM <T>>("aim");
+   const int norb = aim.getNumOrbitals();
+   int nalpha = aim.getNumAlphaElectrons();
+   int nbeta = aim.getNumBetaElectrons();
+   int nirreps = aim.getNumIrreps() ;
 
     auto& S  = this->template get   <SymmetryBlockedTensor<T>>("S");
     auto& Fa = this->template get   <SymmetryBlockedTensor<T>>("Fa");
@@ -404,11 +404,11 @@ void uhf_modelh<T>::diagonalizeFock()
 template <typename T>
 void uhf_modelh<T>::calcS2()
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
-   const int norb = hubbard.getNumOrbitals();
-   int nalpha = hubbard.getNumAlphaElectrons();
-   int nbeta = hubbard.getNumBetaElectrons();
-   int nirreps = hubbard.getNumIrreps() ;
+   auto& aim =this->template get<AIM <T>>("aim");
+   const int norb = aim.getNumOrbitals();
+   int nalpha = aim.getNumAlphaElectrons();
+   int nbeta = aim.getNumBetaElectrons();
+   int nirreps = aim.getNumIrreps() ;
 
     auto& S = this->template get<SymmetryBlockedTensor<T>>("S"); // this must be set to a unit matrix
 
@@ -453,7 +453,7 @@ void uhf_modelh<T>::calcEnergy()
     Fa["ab"] += H["ab"];
     Fb["ab"] += H["ab"];
 
-//    this->energy()  = hubbard.getNuclearRepulsion();
+//    this->energy()  = aim.getNuclearRepulsion();
     this->energy()  = 0.5*scalar(Da["ab"]*Fa["ab"]);
     this->energy() += 0.5*scalar(Db["ab"]*Fb["ab"]);
     Fa["ab"] -= H["ab"];
@@ -463,11 +463,11 @@ void uhf_modelh<T>::calcEnergy()
 template <typename T>
 void uhf_modelh<T>::calcDensity()
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
-   const int norb = hubbard.getNumOrbitals();
-   int nalpha = hubbard.getNumAlphaElectrons();
-   int nbeta = hubbard.getNumBetaElectrons();
-   int nirreps = hubbard.getNumIrreps() ;
+   auto& aim =this->template get<AIM <T>>("aim");
+   const int norb = aim.getNumOrbitals();
+   int nalpha = aim.getNumAlphaElectrons();
+   int nbeta = aim.getNumBetaElectrons();
+   int nirreps = aim.getNumIrreps() ;
 
     auto& dDa = this->template gettmp<SymmetryBlockedTensor<T>>("dDa");
     auto& dDb = this->template gettmp<SymmetryBlockedTensor<T>>("dDb");
@@ -493,9 +493,9 @@ void uhf_modelh<T>::calcDensity()
 template <typename T>
 void uhf_modelh<T>::buildFock()
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
-   const int norb = hubbard.getNumOrbitals();
-   int nirrep = hubbard.getNumIrreps() ;
+   auto& aim =this->template get<AIM <T>>("aim");
+   const int norb = aim.getNumOrbitals();
+   int nirrep = aim.getNumIrreps() ;
 
     for (int i = 1;i < nirrep;i++) ;
 
@@ -510,8 +510,6 @@ void uhf_modelh<T>::buildFock()
     vector<vector<T>> focka(nirrep), fockb(nirrep);
     vector<vector<T>> densa(nirrep), densb(nirrep);
     vector<vector<T>> densab(nirrep);
-
-    read_2e_integrals();
 
     for (int i = 0;i < nirrep;i++)
     {
@@ -541,24 +539,33 @@ void uhf_modelh<T>::buildFock()
    *focka = (densa+densb)*v_onsite - densa*v_onsite 
    *fockb = (densa+densb)*v_onsite - densb*v_onsite 
    */
+     
+      ifstream ifs(path);
+      string line;
 
       if (this->iter() > 0) {
         densab[i] = densa[i];
         axpy(norb*norb, 1.0, densb[i].data(), 1, densab[i].data(), 1);
-       for (int k = 0;k < norb;k++)
-       {
-        focka[i][k+k*norb] += (densab[i][k+k*norb])*v_onsite[k] -  densa[i][k+k*norb]*v_onsite[k] ;
-        fockb[i][k+k*norb] += (densab[i][k+k*norb])*v_onsite[k] -  densb[i][k+k*norb]*v_onsite[k] ;
-       }
+
+      int countline = 0 ;
+
+      while (getline(ifs, line))
+      {
+          countline++ ;
+
+          T val;
+          int p, q, k, l;
+          istringstream(line) >> p >> q >> k >> l >> val;
+
+          focka[i][p*norb+q] += densab[i][k*norb+l]*val; 
+          focka[i][p*norb+l] -= densa[i][k*norb+q]*val; 
+          fockb[i][p*norb+q] += densab[i][k*norb+l]*val; 
+          fockb[i][p*norb+l] -= densb[i][k*norb+q]*val; 
+      }
      }
-        if (Da.norm(2) > 1e-10)
-        {
-            //fill(focka[i].begin(), focka[i].end(), 0.0);
-            //fill(fockb[i].begin(), fockb[i].end(), 0.0);
-        }
     }
 
- for (int i = 0;i < nirrep;i++)
+   for (int i = 0;i < nirrep;i++)
     {
         vector<int> irreps(2,i);
 
@@ -663,6 +670,8 @@ void uhf_modelh<T>::DIISExtrap()
 
 static const char* spec = R"(
 
+    filename?
+        string v_no_sub.txt,
     frozen_core?
         bool false,
     convergence?
@@ -685,5 +694,5 @@ static const char* spec = R"(
 
 )";
 
-INSTANTIATE_SPECIALIZATIONS(aquarius::hubbard::uhf_modelh);
-REGISTER_TASK(CONCAT(aquarius::hubbard::uhf_modelh<double>), "uhf_modelH",spec);
+INSTANTIATE_SPECIALIZATIONS(aquarius::aim::uhf_modelh);
+REGISTER_TASK(CONCAT(aquarius::aim::uhf_modelh<double>), "uhf_aim",spec);
