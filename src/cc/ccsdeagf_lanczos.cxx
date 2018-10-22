@@ -183,7 +183,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
           {
           for (int orbright = orbleft; orbright < orbend ; orbright++)   
            {
-            printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
+              this->log(arena) << "Computing Green's function element: " << orbleft << " "<< orbright << endl ;
 
             bool isalpha_right = false;
             bool isvrt_right = true;
@@ -385,7 +385,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               RL /= norm;
               LL /= norm;
 
-              printf("print norm: %10f\n", norm);
+              this->log(arena) << "print norm: " << norm << endl ;
 
               Iterative<U>::run(dag, arena);
 
@@ -473,6 +473,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
            }
           } 
 
+         if (arena.rank == 0 )
+         {
              std::ofstream gomega;
              gomega.open ("gomega_ea.dat", ofstream::out|std::ios::app);
 
@@ -481,6 +483,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
              }
 
              gomega.close();
+          }
 
             return true;
         }

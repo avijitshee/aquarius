@@ -180,7 +180,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             {
               old_value.clear() ;             
 
-              printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
+              this->log(arena) << "Computing Green's function element: " << orbleft << " "<< orbright << endl ;
 
             bool isalpha_right = false;
             bool isvrt_right = false;
@@ -309,8 +309,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                 e(2)["ija"]  =  L(1)[  "ia"]*apt["j"];
                 e(2)["ija"] -= Gijak["ijam"]*apt["m"];
 
-                e(1)[  "i"] += L(1)[  "ie"]*ap["e"];  //new
-                e(2)["ija"] += L(2)["ijae"]*ap["e"];   //new
+                e(1)[  "i"] += L(1)[  "ie"]*ap["e"];  
+                e(2)["ija"] += L(2)["ijae"]*ap["e"];  
 
             }
             else if((!isvrt_right) && (isvrt_left))
@@ -320,8 +320,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                  *  i       im
                  */
                 b(1)["i"] = ap["i"];
-                b(1)[  "i"] += T(1)[  "ei"]*apt["e"]; //new
-                b(2)["aij"] = T(2)["aeij"]*apt["e"];  //new
+                b(1)[  "i"] += T(1)[  "ei"]*apt["e"]; 
+                b(2)["aij"] = T(2)["aeij"]*apt["e"];  
                 /*
                  *  ijk...   ijk...
                  * e  (e) = l
@@ -357,11 +357,11 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
               if (orbright != orbleft)
               {
-                b(1)["i"] += apt["i"];  //new
-                e(1)[  "i"]  +=               ap["i"]; //extra
-                e(1)[  "i"] -=   Dij[  "im"]*ap["m"];  //extra
-                e(2)["ija"]  +=  L(1)[  "ia"]*ap["j"]; //extra
-                e(2)["ija"] -= Gijak["ijam"]*ap["m"]; //extra
+                b(1)["i"] += apt["i"]; 
+                e(1)[  "i"]  +=               ap["i"]; 
+                e(1)[  "i"] -=   Dij[  "im"]*ap["m"];  
+                e(2)["ija"]  +=  L(1)[  "ia"]*ap["j"]; 
+                e(2)["ija"] -= Gijak["ijam"]*ap["m"]; 
               }
             }
 
@@ -380,7 +380,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
               norm_ip.emplace_back(norm*norm) ;
 
-              printf("print norm: %10f\n", norm);
+              this->log(arena) << "print norm: " << norm << endl ;
               RL /= norm;
               LL /= norm;
 
@@ -475,6 +475,8 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
         }
        }
 
+         if (arena.rank == 0 )
+         {
              std::ofstream gomega;
              gomega.open ("gomega_ip.dat", ofstream::out|std::ios::app);
 
@@ -483,6 +485,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              }
 
              gomega.close();
+         }
 
             return true;
         }
@@ -523,10 +526,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             U beta_temp ;
             U gamma_temp ;
 
-            //printf("<Rr|Ri>: %.15f\n", scalar(Rr*Ri));
-
-            //printf("<B|Rr>: %.15f\n", scalar(b*Rr));
-            //printf("<B|Ri>: %.15f\n", scalar(b*Ri));
 
                 XE[  "e"]    = -0.5*WMNEF["mnfe"]*RL(2)[ "fmn"];
 

@@ -173,17 +173,21 @@ class CCSDSIGMA: public Task
        vector<U> fockoo;
        vector<U> fockvv;
        vector<U> fockov;
+       U piinverse = 1.0/M_PI ;
 
+/* remove all self-energy and total Green's function files those are already there in the directory..
+ */  
+      if (arena.rank == 0)
+      {
        std::ifstream gfile("gf_total.txt");
        if (gfile) remove("gf_total.txt");
 
        std::ifstream specfile("spectral_fn.txt");
        if (specfile) remove("spectral_fn.txt");
 
-       U piinverse = 1.0/M_PI ;
+       std::ifstream sigomega("sigma_total.txt");
+       if (sigomega) remove("sigma_total.txt");
 
-/* remove all self-energy and total Green's function files those are already there in the directory..
- */  
        for (int nspin = 0; nspin < maxspin ; nspin++)   
        { 
         for (int i = 0;i < nr_impurities;i++)
@@ -207,10 +211,10 @@ class CCSDSIGMA: public Task
           if (sigmafile) remove(fileName.c_str());
         } 
        }
+      }
 
 /* Reading one electron integrals here. It will be nicer to read them separately within a function.. 
  */   
-
        std::ifstream one_diag("one_diag.txt");
        std::istream_iterator<U> start(one_diag), end;
        vector<U> diagonal(start, end);
@@ -273,17 +277,19 @@ class CCSDSIGMA: public Task
     /* calculate total Green's function
      */ 
 
-      recalculate_gf(0., omega, gf_tmp) ;
+//    recalculate_gf(0., omega, gf_tmp) ;
 
-//    calculate_total_gf(gf_ip[nspin][omega],gf_ea[nspin][omega],gf_tmp) ; 
+      calculate_total_gf(gf_ip[nspin][omega],gf_ea[nspin][omega],gf_tmp) ; 
 
-    if (nr_impurities > 0)
-    {
+   if (nr_impurities > 0)
+   {
        moao_transform_gf(gf_tmp, c_full, gf_imp) ; 
 
-   /*  store impurity Green's funtion in a file
+   /*  store impurity Green's function in a file
     */
 
+    if (arena.rank == 0)
+    { 
       for (int i = 0; i < nr_impurities ; i++){
          for (int j = 0; j < nr_impurities ; j++){
 	      std::ofstream gomega;
@@ -292,125 +298,165 @@ class CCSDSIGMA: public Task
 	      gomega.close();
          }
       }
+    }
 
    /* spectral function to a file
     */
 
+    if (arena.rank == 0)
+    { 
      if (grid_type == "real")
      {
         for (int i = 0; i < nr_impurities ; i++){
           std::stringstream stream;
            stream << "spectral_fn_"<<nspin<<"_"<<i<< ".txt";
            std::string fileName = stream.str();
-          std::ofstream gspec;
+           std::ofstream gspec;
            gspec.open (fileName.c_str(), ofstream::out|std::ios::app);
            gspec << omegas[omega].real() << " " << -piinverse*gf_imp[i*nr_impurities+i].imag() << std::endl ;
           gspec.close();
         }
      }
     }
+   }
 
    /* calculate self-energy
     */ 
-       calculate_sigma(0., omega, gf_tmp, sigma[omega]) ;
+
+       if (nr_impurities == 0)
+       {
+         calculate_sigma(0., omega, gf_tmp, sigma[omega]) ;
+
+        if (arena.rank == 0)
+        { 
+         if (grid_type == "real")
+         {
+	      std::ofstream specdensity;
+	      specdensity.open ("spectral_fn.txt", ofstream::out|std::ios::app);
+              U value = 0. ;
+              for (int j = 0; j < norb ; j++)
+              {
+                value += gf_tmp[j*nr_impurities+j].imag() ;
+              }            
+	      specdensity << setprecision(12) << omegas[omega].real() << -piinverse*value << std::endl ; 
+	      specdensity.close();
+         } 
+        }  
+       }
 
        energy += E2b(sigma[omega],gf_tmp) ;
 
        calculate_density(omega,gf_tmp,density) ;
     } 
    }
+
+   if (arena.rank == 0)
+   { 
+    if (nr_impurities == 0)
+    {
+      for (int i = 0; i < norb ; i++){
+         for (int j = 0; j < norb ; j++){
+	      std::ofstream sigomega;
+	      sigomega.open ("sigma_total.txt", ofstream::out|std::ios::app);
+	      sigomega << setprecision(12) << sigma[0][i*norb+j] << std::endl ; 
+	      sigomega.close();
+         }
+      }
+    }
+   }
+
       add_density_high_frequency_tail(density) ;
 
-      printf("Tr(Sigma.G) energy: %.15f\n", (2.0/beta)*energy);
+      this->log(arena) << "Tr(Sigma.G) energy: " << setprecision(10) << (2.0/beta)*energy << endl ;
 
    /* bisection starts here
     */
 
-      U thrs = 1.e-5 ;
-      U mu = 0. ;
+  //  U thrs = 1.e-5 ;
+  //  U mu = 0. ;
 
-//      bisection_HF(mu) ; 
+////    bisection_HF(mu) ; 
 
-//      if (abs((ni+nI) - 2.0*trace(density)) > thrs) 
-//      {
-       energy = 0. ; 
+////    if (abs((ni+nI) - 2.0*trace(density)) > thrs) 
+////    {
+  //   energy = 0. ; 
  
-       density.clear() ;
+  //   density.clear() ;
 
-       vector<vector<CU>> gf_final(nmax,vector<CU>(norb*norb)) ;
+  //   vector<vector<CU>> gf_final(nmax,vector<CU>(norb*norb)) ;
 
-       bisection(mu, sigma, gf_final, density) ;
+  //   bisection(mu, sigma, gf_final, density) ;
 
-       for (int omega = 0; omega < nmax ; omega++)
-       {
-        sigma[omega].clear ();
-        calculate_sigma(0., omega, gf_final[omega], sigma[omega]) ;
-        energy += E2b(sigma[omega], gf_final[omega]) ; 
-       }
-        printf("Tr(Sigma.G) energy: %.15f\n", (2.0/beta)*energy);
-//      }
+  //   for (int omega = 0; omega < nmax ; omega++)
+  //   {
+  //    sigma[omega].clear ();
+  //    calculate_sigma(0., omega, gf_final[omega], sigma[omega]) ;
+  //    energy += E2b(sigma[omega], gf_final[omega]) ; 
+  //   }
+  //    printf("Tr(Sigma.G) energy: %.15f\n", (2.0/beta)*energy);
+////    }
 
-      energy *= (2.0/beta) ;
+  //  energy *= (2.0/beta) ;
 
-      energy -= E1b(arena, occ, vrt, H, density) ;
-      printf("total energy: %.15f\n", energy);
-      energy += (1.0/beta)*E2b_high_frequency(sigma[nmax-1]) ;
+  //  energy -= E1b(arena, occ, vrt, H, density) ;
+  //  printf("total energy: %.15f\n", energy);
+  //  energy += (1.0/beta)*E2b_high_frequency(sigma[nmax-1]) ;
 
-      printf("total energy: %.15f\n", energy);
+  //  printf("total energy: %.15f\n", energy);
 
-      vector<U> density_ao(norb*norb,0.) ;
+  //  vector<U> density_ao(norb*norb,0.) ;
 
-      printf("high frequency tail: %.15f\n", E2b_high_frequency(sigma[nmax-1])/beta);
+  //  printf("high frequency tail: %.15f\n", E2b_high_frequency(sigma[nmax-1])/beta);
 
-      moao_transform_gf(density, c_full, density_ao) ; 
+  //  moao_transform_gf(density, c_full, density_ao) ; 
 
-//      std::ofstream dens_ao;
-//      dens_ao.open("coeff.txt", ofstream::out);
+////    std::ofstream dens_ao;
+////    dens_ao.open("coeff.txt", ofstream::out);
 
-      for (int p = 0; p < norb ;p++)
-      {
-        for (int q = 0; q < norb ;q++)
-        {
-//          dens_ao << setprecision(10) << density_ao[p*norb + q] << std::endl ; 
-        }
-      }
+  //  for (int p = 0; p < norb ;p++)
+  //  {
+  //    for (int q = 0; q < norb ;q++)
+  //    {
+////        dens_ao << setprecision(10) << density_ao[p*norb + q] << std::endl ; 
+  //    }
+  //  }
 
-//        dens_ao.close() ;
+////      dens_ao.close() ;
 
-         vector<U> l(norb*norb);
-         vector<CU> s_tmp(norb);
-         vector<U> vr_tmp(norb*norb);
+  //     vector<U> l(norb*norb);
+  //     vector<CU> s_tmp(norb);
+  //     vector<U> vr_tmp(norb*norb);
 
-         int info_ener = geev('N', 'V', norb, fock.data(), norb,
-                     s_tmp.data(), l.data(), norb,
-                     vr_tmp.data(), norb);
+  //     int info_ener = geev('N', 'V', norb, fock.data(), norb,
+  //                 s_tmp.data(), l.data(), norb,
+  //                 vr_tmp.data(), norb);
 
-         if (info_ener != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info_ener));
+  //     if (info_ener != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info_ener));
 
-         cout<<" #orbital energies" <<endl ;
+  //     cout<<" #orbital energies" <<endl ;
 
-         for (int i=0 ; i < norb ; i++){
-             printf(" %.15f\n", s_tmp[i].real());
-          }
+  //     for (int i=0 ; i < norb ; i++){
+  //         printf(" %.15f\n", s_tmp[i].real());
+  //      }
 
-         l.clear() ;
-         s_tmp.clear();
-         vr_tmp.clear();
+  //     l.clear() ;
+  //     s_tmp.clear();
+  //     vr_tmp.clear();
 
-         U value = 0. ; 
-         int info = geev('N', 'V', norb, density.data(), norb,
-                     s_tmp.data(), l.data(), norb,
-                     vr_tmp.data(), norb);
-         if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
+  //     U value = 0. ; 
+  //     int info = geev('N', 'V', norb, density.data(), norb,
+  //                 s_tmp.data(), l.data(), norb,
+  //                 vr_tmp.data(), norb);
+  //     if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
 
-         cout<<" #orbital occupation" <<endl ;
+  //     cout<<" #orbital occupation" <<endl ;
 
-         for (int i=0 ; i < norb ; i++){
-             printf(" %.15f\n", 2.0*s_tmp[i].real());
-             value += density[i*norb+i];
-          }
+  //     for (int i=0 ; i < norb ; i++){
+  //         printf(" %.15f\n", 2.0*s_tmp[i].real());
+  //         value += density[i*norb+i];
+  //      }
 
-         printf("total occupancy: %.15f\n", value);
+  //     printf("total occupancy: %.15f\n", value);
 
       return true;
    }
@@ -502,6 +548,7 @@ class CCSDSIGMA: public Task
          CU gamma_temp ;
          CU com_one(1.,0.) ;
          CU value, value1 ;
+         CU mucomplex = {mu, 0.} ;
 
          for (int p = 0; p < norb ;p++)
          {
@@ -515,7 +562,7 @@ class CCSDSIGMA: public Task
               beta_temp  = {beta_ip[(p*norb+q)-p*(p+1)/2][i],0.} ;
               gamma_temp = {gamma_ip[(p*norb+q)-p*(p+1)/2][i],0.} ;
 
-              value = (com_one)/(omegas[omega] + mu + alpha_temp - beta_temp*gamma_temp*value1) ;                 
+              value = (com_one)/(omegas[omega] + mucomplex + alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
              }
               gf[(p*norb+q)-p*(p+1)/2] = value*norm_ip[(p*norb+q)-p*(p+1)/2]  ;
@@ -539,10 +586,11 @@ class CCSDSIGMA: public Task
          CU gamma_temp ;
          CU com_one(1.,0.) ;
          CU value, value1 ;
+         CU mucomplex = {mu, 0.} ;
 
          for (int p = 0; p < norb ;p++)
          {
-          for (int q = 0; q < norb ;q++)
+          for (int q = p; q < norb ;q++)
           {
               value  = {0.,0.} ;
               value1 = {0.,0.} ;
@@ -552,7 +600,7 @@ class CCSDSIGMA: public Task
               beta_temp  = {beta_ea[(p*norb+q)-p*(p+1)/2][i],0.} ;
               gamma_temp = {gamma_ea[(p*norb+q)-p*(p+1)/2][i],0.} ;
 
-              value = (com_one)/(omegas[omega] + mu - alpha_temp - beta_temp*gamma_temp*value1) ;                 
+              value = (com_one)/(omegas[omega] + mucomplex - alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;   
               }
               gf[(p*norb+q)-p*(p+1)/2] = value*norm_ea[(p*norb+q)-p*(p+1)/2] ;

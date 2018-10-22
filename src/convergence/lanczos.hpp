@@ -153,7 +153,7 @@ class Lanczos : public task::Destructible
              r[0] -= alpha[nextrap]*c_r ;
            }
 
-             if (nextrap > 0) printf(" old c_r: %.10f \n",scalar(old_c_r[0]*old_c_r[0]));
+//             if (nextrap > 0) printf(" old c_r: %.10f \n",scalar(old_c_r[0]*old_c_r[0]));
 
             /* calculate s = hc_l - beta(i-1)pT(i-1) - alpha(i)pT(i)
              */
@@ -187,13 +187,13 @@ class Lanczos : public task::Destructible
               c_r = r[0]/beta[nextrap-1] ; 
              }
 
-            printf("test orthogonality: %.10f \n",scalar(c_r*old_c_l[0]));
-            printf("test orthogonality: %.10f \n",scalar(c_l*old_c_r[0]));
-            printf("test normalization: %.10f \n",scalar(c_r*c_l));
+//          printf("test orthogonality: %.10f \n",scalar(c_r*old_c_l[0]));
+//          printf("test orthogonality: %.10f \n",scalar(c_l*old_c_r[0]));
+//          printf("test normalization: %.10f \n",scalar(c_r*c_l));
 
-            printf("print alpha: %.10f \n",alpha[nextrap-1]);
-            printf("print beta: %.10f \n",beta[nextrap-1]);
-            printf("print gamma: %.10f \n",gamma[nextrap-1]);
+//          printf("print alpha: %.10f \n",alpha[nextrap-1]);
+//          printf("print beta: %.10f \n",beta[nextrap-1]);
+//          printf("print gamma: %.10f \n",gamma[nextrap-1]);
         }
 
         void extrapolate_tridiagonal(op::ExcitationOperator  <T,2,1>& c_r,op::DeexcitationOperator<V,2,1>& c_l,op::ExcitationOperator  <T,2,1>& hc_r, op::DeexcitationOperator<V,2,1>& hc_l, const op::Denominator<T>& D, unique_vector<T>& alpha, unique_vector<T>& beta, unique_vector<T>& gamma)
@@ -256,13 +256,13 @@ class Lanczos : public task::Destructible
               c_r = r[0]/beta[nextrap-1] ; 
              } 
  
-            printf("test orthogonality: %.10f \n",scalar(c_r*old_c_l_particle[0]));
-            printf("test orthogonality: %.10f \n",scalar(old_c_r_particle[0]*c_l));
-            printf("test normalization: %.10f \n",scalar(c_r*c_l));
+//          printf("test orthogonality: %.10f \n",scalar(c_r*old_c_l_particle[0]));
+//          printf("test orthogonality: %.10f \n",scalar(old_c_r_particle[0]*c_l));
+//          printf("test normalization: %.10f \n",scalar(c_r*c_l));
 
-            printf("print alpha: %.10f \n",alpha[nextrap-1]);
-            printf("print beta: %.10f \n",beta[nextrap-1]);
-            printf("print gamma: %.10f \n",gamma[nextrap-1]);
+//          printf("print alpha: %.10f \n",alpha[nextrap-1]);
+//          printf("print beta: %.10f \n",beta[nextrap-1]);
+//          printf("print gamma: %.10f \n",gamma[nextrap-1]);
         }
 
         void reset(int nvec = 1)

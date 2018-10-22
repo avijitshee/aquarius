@@ -19,6 +19,7 @@ uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
 : Iterative<T>(name, config), frozen_core(config.get<bool>("frozen_core")),
   path(config.get<string>("filename")), diis(config.get("diis"), 2)
 {
+    damp_density = config.get<double>("damping_density");
     vector<Requirement> reqs;
     reqs += Requirement("aim", "aim");
     reqs += Requirement("aim_S", "S");
@@ -486,6 +487,8 @@ void uhf_modelh<T>::calcDensity()
     dDb["ab"]  = Db["ab"];
      Da["ab"]  = Ca_occ["ai"]*Ca_occ["bi"];
      Db["ab"]  = Cb_occ["ai"]*Cb_occ["bi"];
+     damp_density*Da["ab"] += (1.-damp_density)*dDa["ab"] ;
+     damp_density*Db["ab"] += (1.-damp_density)*dDb["ab"] ;
     dDa["ab"] -= Da["ab"];
     dDb["ab"] -= Db["ab"];
 }
@@ -510,6 +513,7 @@ void uhf_modelh<T>::buildFock()
     vector<vector<T>> focka(nirrep), fockb(nirrep);
     vector<vector<T>> densa(nirrep), densb(nirrep);
     vector<vector<T>> densab(nirrep);
+    T diff ;
 
     for (int i = 0;i < nirrep;i++)
     {
@@ -535,11 +539,12 @@ void uhf_modelh<T>::buildFock()
 
 
   /*construct coulomb and exchange part of the fock matrix from 2-e integrals..
-   *for the moment this definition will work. but more general definition would be 
-   *focka = (densa+densb)*v_onsite - densa*v_onsite 
-   *fockb = (densa+densb)*v_onsite - densb*v_onsite 
+   *focka = (densa+densb)*v_d - densa*v_ex 
+    fockb = (densa+densb)*v_d - densb*v_ex 
    */
      
+    if (arena.rank == 0)
+    {
       ifstream ifs(path);
       string line;
 
@@ -562,7 +567,12 @@ void uhf_modelh<T>::buildFock()
           fockb[i][p*norb+q] += densab[i][k*norb+l]*val; 
           fockb[i][p*norb+l] -= densb[i][k*norb+q]*val; 
       }
-     }
+      }
+    } else {
+          fill(focka[i].begin(), focka[i].end(), 0.);
+          fill(fockb[i].begin(), fockb[i].end(), 0.);
+    }
+
     }
 
    for (int i = 0;i < nirrep;i++)
@@ -678,6 +688,8 @@ static const char* spec = R"(
         double 1e-12,
     max_iterations?
         int 150,
+    damping_density?
+        double 0., 
     conv_type?
         enum { MAXE, RMSE, MAE },
     diis?

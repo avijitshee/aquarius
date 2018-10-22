@@ -19,6 +19,7 @@ uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
 : Iterative<T>(name, config), frozen_core(config.get<bool>("frozen_core")),
   diis(config.get("diis"), 2)
 {
+    damp_density = config.get<double>("damping_density");
     vector<Requirement> reqs;
     reqs += Requirement("hubbard", "hubbard");
     reqs += Requirement("hubbard_S", "S");
@@ -486,6 +487,8 @@ void uhf_modelh<T>::calcDensity()
     dDb["ab"]  = Db["ab"];
      Da["ab"]  = Ca_occ["ai"]*Ca_occ["bi"];
      Db["ab"]  = Cb_occ["ai"]*Cb_occ["bi"];
+     damp_density*Da["ab"] += (1.-damp_density)*dDa["ab"] ;
+     damp_density*Db["ab"] += (1.-damp_density)*dDb["ab"] ;
     dDa["ab"] -= Da["ab"];
     dDb["ab"] -= Db["ab"];
 }
@@ -669,6 +672,8 @@ static const char* spec = R"(
         double 1e-12,
     max_iterations?
         int 150,
+    damping_density?
+        double 0., 
     conv_type?
         enum { MAXE, RMSE, MAE },
     diis?
