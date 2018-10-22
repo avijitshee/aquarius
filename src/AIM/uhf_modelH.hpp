@@ -25,10 +25,10 @@ class uhf_modelh : public Iterative<T>
     protected:
         bool frozen_core;
         T damping;
+        T damp_density;
         string path ;
         vector<int> occ_alpha, occ_beta;
         vector<vector<T>> E_alpha, E_beta;
-//        vector<real_type_t<T>> E_alpha, E_beta;
         convergence::DIIS<tensor::SymmetryBlockedTensor<T>> diis;
 
     public:
