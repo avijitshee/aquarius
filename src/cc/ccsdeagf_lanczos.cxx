@@ -391,16 +391,12 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
               nvec_lanczos = alpha.size() ; 
 
+              alpha_ea[uppertriangle].resize(nvec_lanczos) ;
+              beta_ea[uppertriangle].resize(nvec_lanczos) ;
+              gamma_ea[uppertriangle].resize(nvec_lanczos) ;
 
-              for (int ndim = 0;ndim < orbend*(orbend+1)/2 ;ndim++)
-             {
-              alpha_ea[ndim].resize(nvec_lanczos) ;
-              beta_ea[ndim].resize(nvec_lanczos) ;
-              gamma_ea[ndim].resize(nvec_lanczos) ;
-             }
-
-  /*Define full trdiagonal matrix 
-   */  
+/*Define full trdiagonal matrix 
+ */  
 
               vector<U> Tdiag(nvec_lanczos*nvec_lanczos);
 

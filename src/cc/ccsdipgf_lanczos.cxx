@@ -388,12 +388,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
               nvec_lanczos = alpha.size() ; 
 
-             for (int ndim = 0;ndim < orbend*(orbend+1)/2 ;ndim++)
-             {
-              alpha_ip[ndim].resize(nvec_lanczos) ;
-              beta_ip[ndim].resize(nvec_lanczos) ;
-              gamma_ip[ndim].resize(nvec_lanczos) ;
-             }  
+              alpha_ip[uppertriangle].resize(nvec_lanczos) ;
+              beta_ip[uppertriangle].resize(nvec_lanczos) ;
+              gamma_ip[uppertriangle].resize(nvec_lanczos) ;
 
   /*Define full trdiagonal matrix 
    */  
