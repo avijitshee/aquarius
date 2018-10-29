@@ -157,7 +157,6 @@ class CCSDDensity : public Task
 
 //symmetrize density matrix
 
-
             vector<U> l(norb*norb);
             vector<CU> s_tmp(norb);
             vector<U> vr_tmp(norb*norb);
@@ -172,7 +171,6 @@ class CCSDDensity : public Task
 
             for (int i=0 ; i < norb ; i++){
                 printf(" %.15f\n", s_tmp[i].real());
-//                value += s_tmp[i].real();
                 value += density[i*norb+i];
              }
 

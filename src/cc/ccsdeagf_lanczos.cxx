@@ -391,17 +391,12 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
               nvec_lanczos = alpha.size() ; 
 
-
-              for (int ndim = 0;ndim < orbend*(orbend+1)/2 ;ndim++)
-             {
-              alpha_ea[ndim].resize(nvec_lanczos) ;
-              beta_ea[ndim].resize(nvec_lanczos) ;
-              gamma_ea[ndim].resize(nvec_lanczos) ;
-             }
+              alpha_ea[uppertriangle].resize(nvec_lanczos) ;
+              beta_ea[uppertriangle].resize(nvec_lanczos) ;
+              gamma_ea[uppertriangle].resize(nvec_lanczos) ;
 
   /*Define full trdiagonal matrix 
    */  
-
               vector<U> Tdiag(nvec_lanczos*nvec_lanczos);
 
               for (int i=0 ; i < nvec_lanczos ; i++){
@@ -435,6 +430,12 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 //            printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
             }
 
+
+           if (arena.rank ==0)
+           {
+            std::ifstream iffile("gomega_ea.dat");
+            if (iffile) remove("gomega_ea.dat");
+           }
 
             int omega_counter = 0 ;
             for (auto& o : omegas)
@@ -478,10 +479,17 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
              std::ofstream gomega;
              gomega.open ("gomega_ea.dat", ofstream::out|std::ios::app);
 
-             for (int i=0 ; i < omegas.size() ; i++){
-               gomega << omegas[i].real() << " " << -1/M_PI*spec_func[i].imag() << std::endl ;
-             }
+//           for (int i=0 ; i < omegas.size() ; i++){
+//             gomega << omegas[i].real() << " " << -1/M_PI*spec_func[i].imag() << std::endl ;
+//           }
 
+            int  uppertriangle = 0 ;
+            for (int i=0 ; i < (nI+nA) ; i++){
+             for (int j=i ; j < (nI+nA) ; j++){
+               gomega << i << " " << j << " " << gf_ea[0][0][uppertriangle] << std::endl ;
+               uppertriangle += 1 ;
+             }
+            }
              gomega.close();
           }
 

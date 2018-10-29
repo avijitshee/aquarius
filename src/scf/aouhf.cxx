@@ -80,17 +80,16 @@ void AOUHF<T,WhichUHF>::buildFock()
           coeff_exists = true ; 
           std::istream_iterator<T> start(coeff), end;
           std::vector<T> coefficient(start, end);
-          std::cout << "Read " << coefficient.size() << " numbers" << std::endl;
+//          std::cout << "Read " << coefficient.size() << " numbers" << std::endl;
           std::copy(coefficient.begin(), coefficient.end(),std::back_inserter(densa[i])); 
          }
   
-       if (coeff_exists) densb[i] = densa[i] ; 
+       if (coeff_exists){ densb[i] = densa[i] ; 
 
-
-      for (int j = 0;j < norb[i]*norb[i];j++)
-      {
-        energy_firstiter  += 0.5*(focka[i][j]*densa[i][j] + fockb[i][j]*densb[i][j]) ;
-      } 
+        for (int j = 0;j < norb[i]*norb[i];j++)
+        {
+          energy_firstiter  += 0.5*(focka[i][j]*densa[i][j] + fockb[i][j]*densb[i][j]) ;
+        }} 
 
         densab[i] = densa[i];
         //PROFILE_FLOPS(norb[i]*norb[i]);
@@ -291,9 +290,7 @@ void AOUHF<T,WhichUHF>::buildFock()
       } 
     }
 
-    cout << "energy from 1st iteration " << endl ;
-
-    cout << setprecision(10) << energy_firstiter+molecule.getNuclearRepulsion() << endl ;
+    Logger::log(arena) << "energy from 1st iteration: " << setprecision(10) << energy_firstiter+molecule.getNuclearRepulsion() << endl ;
 
 }
 

@@ -169,7 +169,13 @@ class Lanczos : public task::Destructible
 
              temp = scalar(r[0]*s[0]) ; 
 
-             beta.emplace_back (sqrt(aquarius::abs(scalar(r[0]*s[0])))) ;
+             if (abs(temp) > 1.0e-10)
+             {
+               beta.emplace_back (sqrt(aquarius::abs(scalar(r[0]*s[0])))) ;
+             }else
+             {
+               beta.emplace_back (0.0) ;
+             }
 
              if (beta[nextrap] > 1.0e-10)
              {
@@ -239,7 +245,14 @@ class Lanczos : public task::Destructible
 
              temp = scalar(r[0]*s[0]) ; 
 
-             beta.emplace_back (sqrt(aquarius::abs(scalar(r[0]*s[0])))) ;
+             if (abs(temp) > 1.0e-10)
+             {
+               beta.emplace_back (sqrt(aquarius::abs(scalar(r[0]*s[0])))) ;
+             }else
+             {
+               beta.emplace_back (0.0) ;
+             }
+
              if (beta[nextrap] > 1.0e-10)
              {
               gamma.emplace_back (temp/beta[nextrap])  ; 

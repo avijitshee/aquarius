@@ -79,7 +79,7 @@ bool UHF<T>::run(TaskDAG& dag, const Arena& arena)
     ep.begin();
     Iterative<T>::run(dag, arena);
     ep.end();
-
+    Logger::log(arena) << setprecision(10) << "Nuclear Repulsion Energy" << " " << molecule.getNuclearRepulsion() << endl ;
     if (this->isUsed("S2") || this->isUsed("multiplicity"))
     {
         calcS2();
@@ -310,7 +310,6 @@ void UHF<T>::calcEnergy()
     this->energy() += 0.5*scalar(Db["ab"]*Fb["ab"]);
     Fa["ab"] -= H["ab"];
     Fb["ab"] -= H["ab"];
-    cout << setprecision(10) << "Nuclear Repulsion Energy" << " " << molecule.getNuclearRepulsion() << endl ;
 }
 
 template <typename T>

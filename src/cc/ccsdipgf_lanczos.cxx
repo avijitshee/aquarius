@@ -121,10 +121,25 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
             Gijak["ijak"] = L(2)["ijae"]*T(1)["ek"];
 
-           if (orb_range == "full") 
-           { orbstart = 0 ;
+           if (orb_range == "full"){ 
+             nr_tasks =  (nI+nA)*((nI+nA)+1)/2 ;
+             nsize = floor(nr_tasks/area.size) ; 
+
+             element_start = arena.rank*nsize ;
+             if (area.rank < (area.size-1)) {
+               element_end = element_start + nsize ;
+             } else {
+               element_end = nr_tasks - (nsize*(area.size-1)) ;
+             }
+
+             orbstart = 0 ;
              orbend = nI + nA ;  
              gf_ip.resize(maxspin);
+//             alpha_ip.resize(orbend*(orbend+1)/2) ;
+//             beta_ip.resize(orbend*(orbend+1)/2) ;
+//             gamma_ip.resize(orbend*(orbend+1)/2) ;
+
+
              alpha_ip.resize(orbend*(orbend+1)/2) ;
              beta_ip.resize(orbend*(orbend+1)/2) ;
              gamma_ip.resize(orbend*(orbend+1)/2) ;
@@ -173,6 +188,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
          {
 
          uppertriangle = 0 ;
+
 
          for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   
           {
@@ -388,12 +404,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
               nvec_lanczos = alpha.size() ; 
 
-             for (int ndim = 0;ndim < orbend*(orbend+1)/2 ;ndim++)
-             {
-              alpha_ip[ndim].resize(nvec_lanczos) ;
-              beta_ip[ndim].resize(nvec_lanczos) ;
-              gamma_ip[ndim].resize(nvec_lanczos) ;
-             }  
+              alpha_ip[uppertriangle].resize(nvec_lanczos) ;
+              beta_ip[uppertriangle].resize(nvec_lanczos) ;
+              gamma_ip[uppertriangle].resize(nvec_lanczos) ;
 
   /*Define full trdiagonal matrix 
    */  
@@ -412,7 +425,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             beta_ip[uppertriangle][i] = beta[i] ;
             gamma_ip[uppertriangle][i] = gamma[i] ;
          }
- 
+
   /*
    * Diagonalize the tridiagonal matrix to see if that produces EOM-IP values..
    */
@@ -430,9 +443,12 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 //              printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
              }
 
+           if (arena.rank ==0)
+           {
             std::ifstream iffile("gomega_ip.dat");
             if (iffile) remove("gomega_ip.dat");
-
+           }
+ 
             U piinverse = 1/M_PI ;
 
             int omega_counter = 0 ;
@@ -480,13 +496,20 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              std::ofstream gomega;
              gomega.open ("gomega_ip.dat", ofstream::out|std::ios::app);
 
-             for (int i=0 ; i < omegas.size() ; i++){
-               gomega << omegas[i].real() << " " << -1/M_PI*spec_func[i].imag() << std::endl ;
+//           for (int i=0 ; i < omegas.size() ; i++){
+//             gomega << omegas[i].real() << " " << -1/M_PI*spec_func[i].imag() << std::endl ;
+//           }
+
+            int  uppertriangle = 0 ;
+            for (int i=0 ; i < (nI+nA) ; i++){
+             for (int j=i ; j < (nI+nA) ; j++){
+               gomega << i << " " << j << " " << gf_ip[0][0][uppertriangle] << std::endl ;
+               uppertriangle += 1 ;
              }
+            }
 
              gomega.close();
          }
-
             return true;
         }
 
@@ -518,7 +541,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             auto& beta  = this->template gettmp<unique_vector<U>> ("beta");
             auto& gamma = this->template gettmp<unique_vector<U>> ("gamma");
 
-            int nvec_lanczos; 
+            int n_lanczos; 
             U value ;
             U delta_value ;
             U value1 ;
@@ -558,10 +581,10 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
               value  = 1. ;
               value1 = 0. ;
-              nvec_lanczos = alpha.size() ; 
+              n_lanczos = alpha.size() ; 
 
-            if (nvec_lanczos > 2) {
-             for(int i=(nvec_lanczos-1);i >= 0;i--){  
+            if (n_lanczos > 2) {
+             for(int i=(n_lanczos-1);i >= 0;i--){  
               alpha_temp = alpha[i] ;
               beta_temp  = beta[i] ;
               gamma_temp = gamma[i] ;
@@ -572,10 +595,10 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              
               old_value.push_back(value) ;
 
-              if (nvec_lanczos <= 2) {
+              if (n_lanczos <= 2) {
                 delta_value = 1.0 ;}
               else{
-                delta_value = old_value[nvec_lanczos-2] - value ;
+                delta_value = old_value[n_lanczos-2] - value ;
               }
               this->conv() = max(pow(beta[beta.size()-1],2), pow(gamma[gamma.size()-1],2));
 //            this->conv() = aquarius::abs(delta_value) ;
