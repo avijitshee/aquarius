@@ -55,6 +55,8 @@ class CCSDSIGMA: public Task
             reqs.emplace_back("Eb", "Eb");
             reqs.emplace_back("Fa", "Fa");
             reqs.emplace_back("Fb", "Fb");
+            reqs.emplace_back("counter", "recvcounts");
+            reqs.emplace_back("displacement", "recvdispls");
             reqs.emplace_back("ccsd.ipgf", "gf_ip");
             reqs.emplace_back("ccsd.eagf", "gf_ea");
 
@@ -122,6 +124,7 @@ class CCSDSIGMA: public Task
          int nirreps = 1;
          auto& gf_ea = this->template get<vector<vector<vector<CU>>>>("gf_ea");
          auto& gf_ip = this->template get<vector<vector<vector<CU>>>>("gf_ip");
+
 
          const auto& occ = this->template get<MOSpace<U>>("occ");
          const auto& vrt = this->template get<MOSpace<U>>("vrt");
@@ -271,7 +274,7 @@ class CCSDSIGMA: public Task
     /* calculate total Green's function
      */ 
 
-        recalculate_gf(0., omega, gf_tmp) ;
+        recalculate_gf(arena, 0., omega, gf_tmp) ;
 
 //      calculate_total_gf(gf_ip[nspin][omega],gf_ea[nspin][omega],gf_tmp) ; 
 
@@ -495,7 +498,7 @@ class CCSDSIGMA: public Task
     } 
 
 
-    void recalculate_gf(U mu, int omega, vector<CU> &gf)
+    void recalculate_gf(const Arena &arena, U mu, int omega, vector<CU> &gf)
     {
 
       vector<CU> gf_ip_temp(norb*(norb+1)/2) ;
@@ -505,7 +508,7 @@ class CCSDSIGMA: public Task
 
       continued_fraction_ea (mu, omega, gf_ea_temp) ; 
 
-      calculate_total_gf(gf_ip_temp, gf_ea_temp, gf) ; 
+      calculate_total_gf(arena, gf_ip_temp, gf_ea_temp, gf) ; 
 
     } 
 
@@ -526,30 +529,25 @@ class CCSDSIGMA: public Task
          CU value, value1 ;
          CU mucomplex = {mu, 0.} ;
 
-         for (int p = 0; p < norb ;p++)
-         {
-          for (int q = p; q < norb ;q++)
-          {
+         for (int p = 0; p < alpha_ip.size() ;p++){
               value  = {0.,0.} ;
               value1 = {0.,0.} ;
 
              for(int i=(nvec_lanczos-1);i >= 0;i--){  
-              alpha_temp = {alpha_ip[(p*norb+q)-p*(p+1)/2][i],0.} ;
-              beta_temp  = {beta_ip[(p*norb+q)-p*(p+1)/2][i],0.} ;
-              gamma_temp = {gamma_ip[(p*norb+q)-p*(p+1)/2][i],0.} ;
+              alpha_temp = {alpha_ip[p][i],0.} ;
+              beta_temp  = {beta_ip[p][i],0.} ;
+              gamma_temp = {gamma_ip[p][i],0.} ;
 
               value = (com_one)/(omegas[omega] + mucomplex + alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;
              }
-              gf[(p*norb+q)-p*(p+1)/2] = value*norm_ip[(p*norb+q)-p*(p+1)/2]  ;
-          }
+              gf[p] = value*norm_ip[p]  ;
          }
 
     }
 
     void continued_fraction_ea (U mu, int omega, vector<CU> &gf)  
     {
-
          auto& alpha_ea = this->template get<vector<vector<U>>>("alpha_ea");
          auto& beta_ea = this->template get<vector<vector<U>>>("beta_ea");
          auto& gamma_ea = this->template get<vector<vector<U>>>("gamma_ea");
@@ -564,24 +562,21 @@ class CCSDSIGMA: public Task
          CU value, value1 ;
          CU mucomplex = {mu, 0.} ;
 
-         for (int p = 0; p < norb ;p++)
-         {
-          for (int q = p; q < norb ;q++)
-          {
-              value  = {0.,0.} ;
-              value1 = {0.,0.} ;
+         for (int p = 0; p < alpha_ea.size() ;p++){
+
+             value  = {0.,0.} ;
+             value1 = {0.,0.} ;
 
              for(int i=(nvec_lanczos-1);i >= 0;i--){  
-              alpha_temp = {alpha_ea[(p*norb+q)-p*(p+1)/2][i],0.} ;
-              beta_temp  = {beta_ea[(p*norb+q)-p*(p+1)/2][i],0.} ;
-              gamma_temp = {gamma_ea[(p*norb+q)-p*(p+1)/2][i],0.} ;
+              alpha_temp = {alpha_ea[p][i],0.} ;
+              beta_temp  = {beta_ea[p][i],0.} ;
+              gamma_temp = {gamma_ea[p][i],0.} ;
 
               value = (com_one)/(omegas[omega] + mucomplex - alpha_temp - beta_temp*gamma_temp*value1) ;                 
               value1 = value ;   
               }
-              gf[(p*norb+q)-p*(p+1)/2] = value*norm_ea[(p*norb+q)-p*(p+1)/2] ;
+              gf[p] = value*norm_ea[p] ;
           }
-         }
     }
 
 
@@ -619,28 +614,42 @@ class CCSDSIGMA: public Task
       } 
     }
 
-   void calculate_total_gf(vector<CU> &gf_ip_temp, vector<CU> &gf_ea_temp, vector<CU> &gf_total) 
-    {
+   void calculate_total_gf(const Arena &arena, vector<CU> &gf_ip_temp, vector<CU> &gf_ea_temp, vector<CU> &gf_total) {
+    
+// we have to apply mpi_gatherv at this step 
+
+     auto& recvcounts = this->template get<vector<int>>("recvcounts");
+     auto& recvdispls = this->template get<vector<int>>("recvdispls");
+
+     int tot_size = norb*(norb+1)/2  ;
+
+     vector<CU> gf_ip_store(tot_size,{0.,0.}) ;
+     vector<CU> gf_ea_store(tot_size,{0.,0.}) ;
+     int send_count = recvcounts[arena.rank] ;
+
+//     arena.comm().Allgather(&gf_ip_temp[0], send_count, &gf_ip_store[0], &recvcounts[0], &recvdispls[0], MPI_DOUBLE_COMPLEX) ;
+     MPI_Allgatherv(gf_ip_temp.data(), send_count, MPI_DOUBLE_COMPLEX, gf_ip_store.data(), recvcounts.data(), recvdispls.data(), MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD) ;
+     MPI_Allgatherv(gf_ea_temp.data(), send_count, MPI_DOUBLE_COMPLEX, gf_ea_store.data(), recvcounts.data(), recvdispls.data(), MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD) ;
+
      if (gf_type == 1){
       for (int p = 0; p < norb ;p++){
         for (int q = p; q < norb ;q++){
          if (q == p){
-           gf_total[p*norb+q] = gf_ip_temp[(p*norb+q)-p*(p+1)/2] + gf_ea_temp[(p*norb+q)-p*(p+1)/2] ; 
+           gf_total[p*norb+q] = gf_ip_store[(p*norb+q)-p*(p+1)/2] + gf_ea_store[(p*norb+q)-p*(p+1)/2] ; 
           }
           else{
-            gf_total[p*norb+q]  = 0.5*( gf_ip_temp[(p*norb+q)-p*(p+1)/2] - gf_ip_temp[(p*norb+p)-p*(p+1)/2] - gf_ip_temp[(q*norb+q)-q*(q+1)/2]) ; 
-            gf_total[p*norb+q] += 0.5*( gf_ea_temp[(p*norb+q)-p*(p+1)/2] - gf_ea_temp[(p*norb+p)-p*(p+1)/2] - gf_ea_temp[(q*norb+q)-q*(q+1)/2]) ; 
+            gf_total[p*norb+q]  = 0.5*( gf_ip_store[(p*norb+q)-p*(p+1)/2] - gf_ip_store[(p*norb+p)-p*(p+1)/2] - gf_ip_store[(q*norb+q)-q*(q+1)/2]) ; 
+            gf_total[p*norb+q] += 0.5*( gf_ea_store[(p*norb+q)-p*(p+1)/2] - gf_ea_store[(p*norb+p)-p*(p+1)/2] - gf_ea_store[(q*norb+q)-q*(q+1)/2]) ; 
           }
 // symmetrize gf_total   
             gf_total[q*norb+p] = gf_total[p*norb+q] ; 
         }
       } 
      }
-     else
-     {
+     else {
       for (int p = 0; p < norb ;p++){
         for (int q = 0; q < norb ;q++){
-          gf_total[p*norb+q] = gf_ip_temp[(p*norb+q)-p*(p+1)/2] + gf_ea_temp[(p*norb+q)-p*(p+1)/2] ; 
+          gf_total[p*norb+q] = gf_ip_store[(p*norb+q)-p*(p+1)/2] + gf_ea_store[(p*norb+q)-p*(p+1)/2] ; 
           gf_total[q*norb+p] = gf_total[p*norb+q] ; 
         }
       } 
@@ -667,8 +676,8 @@ class CCSDSIGMA: public Task
 
      for (int omega = 0; omega < nmax ; omega++)
      {  
-        recalculate_gf(mu, omega, gf[omega], sigma[omega]) ;
-  //    recalculate_gf(mu, omega, gf[omega]) ;
+        recalculate_gf( mu, omega, gf[omega], sigma[omega]) ;
+  //    recalculate_gf( arena, mu, omega, gf[omega]) ;
     
       calculate_density(omega,gf[omega],density) ;
      }

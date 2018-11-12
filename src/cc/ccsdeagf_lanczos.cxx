@@ -66,8 +66,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             orb_range = config.get<string>("orbital_range");
 
             double delta = (to-from)/max(1,n-1);
-            for (int i = 0;i < n;i++)
-            {
+            for (int i = 0;i < n;i++){
              if (grid_type == "real") omegas.emplace_back(from+delta*i, eta);
              if (grid_type == "imaginary") omegas.emplace_back(0.,(2.0*i+1)*M_PI/beta);
             }
@@ -102,6 +101,12 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             int nvec_lanczos; 
             CU value ;
             CU value1 ;
+            int nr_tasks ;
+            int nsize ;
+            int element_start ;
+            int element_end ;
+            int orbleft ;
+            int orbright ;
 
             int maxspin = (nI == ni) ? 1 : 2 ;
 
@@ -125,23 +130,30 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             Gieab["amef"]  = -L(2)["nmef"]*T(1)[  "an"];
 
            if (orb_range == "full") 
-           { orbstart = 0 ;
-             orbend = nI + nA ;  
-             alpha_ea.resize(orbend*(orbend+1)/2) ;
-             beta_ea.resize(orbend*(orbend+1)/2) ;
-             gamma_ea.resize(orbend*(orbend+1)/2) ;
+           {
+             nr_tasks =  (nI+nA)*((nI+nA)+1)/2 ;
+             nsize = int(floor(nr_tasks/arena.size)) ; 
+
+             element_start = arena.rank*nsize ;
+             if (arena.rank < (arena.size-1)) {
+               element_end = element_start + nsize ;
+             } else {
+               element_end = element_start+nr_tasks - (nsize*(arena.size-1)) ;
+             }
+
+             alpha_ea.resize(element_end-element_start) ;
+             beta_ea.resize(element_end-element_start) ;
+             gamma_ea.resize(element_end-element_start) ;
+
              gf_ea.resize(maxspin);
 
-            for (int nspin = 0;nspin < maxspin;nspin++)
-             {
+            for (int nspin = 0;nspin < maxspin;nspin++){
               gf_ea[nspin].resize(omegas.size());
              }  
 
-            for (int nspin = 0;nspin < maxspin;nspin++)
-             {
-              for (int i = 0;i < omegas.size();i++)
-               {
-                gf_ea[nspin][i].resize(orbend*(orbend+1)/2);
+            for (int nspin = 0;nspin < maxspin;nspin++){
+              for (int i = 0;i < omegas.size();i++){
+                gf_ea[nspin][i].resize(element_end-element_start);
                }
              }
            } 
@@ -155,15 +167,12 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
             gf_ea.resize(maxspin);
 
-            for (int nspin = 0;nspin < maxspin;nspin++)
-             {
+            for (int nspin = 0;nspin < maxspin;nspin++){
               gf_ea[nspin].resize(omegas.size());
-             }  
+            }  
 
-            for (int nspin = 0;nspin < maxspin;nspin++)
-             {
-              for (int i = 0;i < omegas.size();i++)
-               {
+            for (int nspin = 0;nspin < maxspin;nspin++){
+              for (int i = 0;i < omegas.size();i++){
                 gf_ea[nspin][i].resize(1);
                }
              }
@@ -171,19 +180,41 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
           vector<CU> spec_func(omegas.size()) ;
 
+        vector<int> array1(nr_tasks);
+        vector<int> array2(nr_tasks);
+        vector< pair <int,int> > get_index ; 
+
+         int x = 0 ; 
+         for (int orbleft = 0; orbleft < (nI+nA) ; orbleft++){   
+           for (int orbright = orbleft; orbright < (nI+nA) ; orbright++){   
+             array1[x] = orbleft ;
+             array2[x] = orbright ;
+             x += 1 ;
+          }
+         }
+
+         for (int i = 0; i < (nI+nA)*((nI+nA)+1)/2 ; i++){   
+            get_index.push_back( make_pair(array1[i],array2[i]) );
+         }
+
+         if (arena.rank ==0){
+           std::ifstream iffile("gomega_ea.dat");
+           if (iffile) remove("gomega_ea.dat");
+         }
+
      /* start calculating all GF elements..
       */  
 
         int uppertriangle ;
 
-        for (int nspin = 0; nspin < maxspin ; nspin++)   
-         {
-           uppertriangle = 0 ;
-         for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   
-          {
-          for (int orbright = orbleft; orbright < orbend ; orbright++)   
-           {
-              this->log(arena) << "Computing Green's function element: " << orbleft << " "<< orbright << endl ;
+        for (int nspin = 0; nspin < maxspin ; nspin++){
+         uppertriangle = 0 ;
+         for (int orbs = element_start; orbs < element_end ; orbs++){   
+
+            orbleft = get_index[orbs].first ;
+            orbright = get_index[orbs].second ;
+
+            this->log(arena) << "Computing Green's function element: " << orbleft << " "<< orbright << endl ;
 
             bool isalpha_right = false;
             bool isvrt_right = true;
@@ -471,7 +502,6 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
              }
               uppertriangle +=1 ;
             }
-           }
           } 
 
          if (arena.rank == 0 )
