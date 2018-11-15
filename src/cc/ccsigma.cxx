@@ -35,10 +35,7 @@ class CCSDSIGMA: public Task
         int gf_type ;
         double beta ;
         int norb ; 
-        int nI ;
-        int ni ; 
-        int nA ;
-        int na ;
+        int nI, ni, nA, na ;
         string grid_type ;
         vector<U> integral_diagonal ;
         vector<U> v_onsite ;
@@ -55,10 +52,6 @@ class CCSDSIGMA: public Task
             reqs.emplace_back("Eb", "Eb");
             reqs.emplace_back("Fa", "Fa");
             reqs.emplace_back("Fb", "Fb");
-            reqs.emplace_back("counter", "recvcounts");
-            reqs.emplace_back("displacement", "recvdispls");
-            reqs.emplace_back("ccsd.ipgf", "gf_ip");
-            reqs.emplace_back("ccsd.eagf", "gf_ea");
 
             reqs.emplace_back("ccsd.ipalpha", "alpha_ip");
             reqs.emplace_back("ccsd.ipbeta", "beta_ip");
@@ -104,27 +97,10 @@ class CCSDSIGMA: public Task
             if (gf_string == "nonsymmetrized") gf_type = 2 ;
          } 
 
-           
-//       inline U f_tau(U tau, U beta, U c1, U c2, U c3){
-//          return -0.5*c1 + (c2*0.25)*(-beta+2.*tau) + (c3*0.25)*(beta*tau-tau*tau);
-//       }
-
-//       inline std::complex<U> f_omega(std::complex<U> iw, U c1, U c2, U c3) {
-//         std::complex<ft_float_type> iwsq=iw*iw;
-//         return c1/iw + c2/(iwsq) + c3/(iw*iwsq);
-//       }
-
-//       double &c1(int s1, int s2, int f){ return c1_[s1*ns_*nf_+s2*nf_+f]; }
-//       double &c2(int s1, int s2, int f){ return c2_[s1*ns_*nf_+s2*nf_+f]; }
-//       double &c3(int s1, int s2, int f){ return c3_[s1*ns_*nf_+s2*nf_+f]; }
-
 
         bool run(TaskDAG& dag, const Arena& arena)
         {
          int nirreps = 1;
-         auto& gf_ea = this->template get<vector<vector<vector<CU>>>>("gf_ea");
-         auto& gf_ip = this->template get<vector<vector<vector<CU>>>>("gf_ip");
-
 
          const auto& occ = this->template get<MOSpace<U>>("occ");
          const auto& vrt = this->template get<MOSpace<U>>("vrt");
@@ -156,7 +132,6 @@ class CCSDSIGMA: public Task
  
          int maxspin = (nI == ni) ? 1 : 2 ;
 
-//       int norb = N[0]; 
          norb = nI+nA; 
  
          for (int i = 0;i < nirreps;i++)
@@ -224,24 +199,23 @@ class CCSDSIGMA: public Task
        vector<U> int_onsite(start_v, end_v);
        std::copy(int_onsite.begin(), int_onsite.end(), std::back_inserter(v_onsite)) ;
 
-    vector<U> density(norb*norb,0.) ;
-    vector<vector<CU>> sigma(nmax,vector<CU>(norb*norb, {0.,0.})) ;
-    vector<vector<CU>> gf_imp(nmax,vector<CU>(nr_impurities*nr_impurities, {0.,0.})) ;
-    U energy = 0. ; 
+       vector<U> density(norb*norb,0.) ;
+       vector<vector<CU>> sigma(nmax,vector<CU>(norb*norb, {0.,0.})) ;
+       vector<vector<CU>> gf_imp(nmax,vector<CU>(nr_impurities*nr_impurities, {0.,0.})) ;
+       U energy = 0. ; 
  
-   for (int nspin = 0;nspin < maxspin;nspin++){
-    for (int i = 0;i < nirreps;i++){
-       vector<int> irreps = {i,i};
-       (nspin == 0) ? cA_.getAllData(irreps, cA[i]) : ca_.getAllData(irreps, ca[i]);
-       assert(cA[i].size() == N[i]*nA[i]);
-       assert(ca[i].size() == N[i]*na[i]);
-       (nspin == 0) ? cI_.getAllData(irreps, cI[i]) : ci_.getAllData(irreps, ci[i]);
-       assert(cI[i].size() == N[i]*nI[i]);
-       assert(ci[i].size() == N[i]*ni[i]);
-     }        
+       for (int nspin = 0;nspin < maxspin;nspin++){
+         for (int i = 0;i < nirreps;i++){
+            vector<int> irreps = {i,i};
+            (nspin == 0) ? cA_.getAllData(irreps, cA[i]) : ca_.getAllData(irreps, ca[i]);
+            assert(cA[i].size() == N[i]*nA[i]);
+            assert(ca[i].size() == N[i]*na[i]);
+            (nspin == 0) ? cI_.getAllData(irreps, cI[i]) : ci_.getAllData(irreps, ci[i]);
+            assert(cI[i].size() == N[i]*nI[i]);
+            assert(ci[i].size() == N[i]*ni[i]);
+         }        
      c_full.clear() ;  
-    for (int i = 0;i < nirreps;i++)
-    {
+    for (int i = 0;i < nirreps;i++){
       (nspin == 0) ? c_full.insert(c_full.begin(),cI[i].begin(),cI[i].end()) : c_full.insert(c_full.begin(),ci[i].begin(),ci[i].end());
       (nspin == 0) ? c_full.insert(c_full.end(),cA[i].begin(),cA[i].end()) : c_full.insert(c_full.end(),ca[i].begin(),ca[i].end());
     }
@@ -273,10 +247,7 @@ class CCSDSIGMA: public Task
 
     /* calculate total Green's function
      */ 
-
         recalculate_gf(arena, 0., omega, gf_tmp) ;
-
-//      calculate_total_gf(gf_ip[nspin][omega],gf_ea[nspin][omega],gf_tmp) ; 
 
     if (nr_impurities > 0){
     
@@ -296,13 +267,11 @@ class CCSDSIGMA: public Task
       }
     }
 
-   /* spectral function to a file
-    */
+/* spectral function to a file
+ */
 
-    if (arena.rank == 0)
-    { 
-     if (grid_type == "real")
-     {
+    if (arena.rank == 0){
+     if (grid_type == "real"){
         for (int i = 0; i < nr_impurities ; i++){
           std::stringstream stream;
            stream << "spectral_fn_"<<nspin<<"_"<<i<< ".txt";
@@ -316,9 +285,8 @@ class CCSDSIGMA: public Task
     }
    }
 
-   /* calculate self-energy
-    */ 
-
+/* calculate self-energy
+ */ 
        if (nr_impurities == 0)
        {
          calculate_sigma(0., omega, gf_tmp, sigma[omega]) ;
@@ -337,10 +305,6 @@ class CCSDSIGMA: public Task
          } 
         }  
        }
-
-       energy += E2b(sigma[omega],gf_tmp) ;
-
-//       calculate_density(omega,gf_tmp,density) ;
     } 
    }
 
@@ -348,33 +312,27 @@ class CCSDSIGMA: public Task
     if (nr_impurities == 0){
       for (int i = 0; i < norb ; i++){
          for (int j = 0; j < norb ; j++){
-	      std::ofstream sigomega;
-	      sigomega.open ("sigma_total.txt", ofstream::out|std::ios::app);
-	      sigomega << setprecision(12) << sigma[0][i*norb+j] << std::endl ; 
-	      sigomega.close();
+	    std::ofstream sigomega;
+	    sigomega.open ("sigma_total.txt", ofstream::out|std::ios::app);
+	    sigomega << setprecision(12) << sigma[0][i*norb+j] << std::endl ; 
+	    sigomega.close();
          }
       }
     }
    }
 
-//    add_density_high_frequency_tail(density) ;
-
-//    this->log(arena) << "Tr(Sigma.G) energy: " << setprecision(10) << (2.0/beta)*energy << endl ;
-
    /* bisection starts here
     */
+
+    if (nr_impurities == 0){
 
       U thrs = 1.e-5 ;
       U mu = 0. ;
 
 //     bisection_HF(mu) ; 
 
-//     if (abs((ni+nI) - 2.0*trace(density)) > thrs) 
-//     {
        energy = 0. ; 
  
-//       density.clear() ;
-
        vector<vector<CU>> gf_final(nmax,vector<CU>(norb*norb)) ;
 
        bisection(arena, mu, sigma, gf_final, density) ;
@@ -385,16 +343,13 @@ class CCSDSIGMA: public Task
         energy += E2b(sigma[omega], gf_final[omega]) ; 
        }
        this->log(arena) << "Tr(Sigma.G) energy: " << (2.0/beta)*energy  << endl ;
-//      }
 
        energy *= (2.0/beta) ;
 
-//      energy -= E1b(arena, occ, vrt, H, density) ;
-//      this->log(arena) << "total energy: " << energy << endl ;
-      energy += (1.0/beta)*E2b_high_frequency(sigma[nmax-1]) ;
+       energy += (1.0/beta)*E2b_high_frequency(sigma[nmax-1]) ;
 
-      this->log(arena) << "high frequency tail: " << E2b_high_frequency(sigma[nmax-1])/beta << endl;
-      this->log(arena) << "total 2b energy: " << energy << endl ;
+       this->log(arena) << "high frequency tail: " << E2b_high_frequency(sigma[nmax-1])/beta << endl;
+       this->log(arena) << "total 2b energy: " << energy << endl ;
 
       vector<U> density_ao(norb*norb,0.) ;
       moao_transform_gf(density, c_full, density_ao) ; 
@@ -411,30 +366,12 @@ class CCSDSIGMA: public Task
       dens_ao.close() ;
       }
 
-//    arena.comm().Barrier();
-
+      U value = 0. ; 
       if (arena.rank == 0) {
       vector<U> l(norb*norb);
       vector<CU> s_tmp(norb);
       vector<U> vr_tmp(norb*norb);
 
-//    int info_ener = geev('N', 'V', norb, fock.data(), norb,
-//                s_tmp.data(), l.data(), norb,
-//                vr_tmp.data(), norb);
-
-//    if (info_ener != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info_ener));
-
-//    this->log(arena) <<" #orbital energies" <<endl ;
-
-//    for (int i=0 ; i < norb ; i++){
-//        this->log(arena) << setprecision(10) << s_tmp[i].real() << endl ;
-//    }
-
-//    l.clear() ;
-//    s_tmp.clear();
-//    vr_tmp.clear();
-
-      U value = 0. ; 
       int info = geev('N', 'V', norb, density.data(), norb,
                   s_tmp.data(), l.data(), norb,
                   vr_tmp.data(), norb);
@@ -446,8 +383,8 @@ class CCSDSIGMA: public Task
           value += density[i*norb+i];
       }}
 
-//    this->log(arena)<<"total occupancy: " << 2.0*value << endl;
-
+      this->log(arena)<<"total occupancy: " << 2.0*value << endl;
+    }
       return true;
    }
 
@@ -500,7 +437,6 @@ class CCSDSIGMA: public Task
 
     void recalculate_gf(const Arena &arena, U mu, int omega, vector<CU> &gf)
     {
-
       vector<CU> gf_ip_temp(norb*(norb+1)/2) ;
       vector<CU> gf_ea_temp(norb*(norb+1)/2) ;
 
@@ -509,7 +445,6 @@ class CCSDSIGMA: public Task
       continued_fraction_ea (mu, omega, gf_ea_temp) ; 
 
       calculate_total_gf(arena, gf_ip_temp, gf_ea_temp, gf) ; 
-
     } 
 
     void continued_fraction_ip (U mu, int omega, vector<CU> &gf)  
@@ -579,7 +514,6 @@ class CCSDSIGMA: public Task
           }
     }
 
-
     void calculate_sigma(U mu, int omega, vector<CU> &gf_total, vector<CU> &sigma)
     {
       vector<int> ipiv(norb,0) ;
@@ -616,30 +550,17 @@ class CCSDSIGMA: public Task
 
    void calculate_total_gf(const Arena &arena, vector<CU> &gf_ip_temp, vector<CU> &gf_ea_temp, vector<CU> &gf_total) {
     
-// we have to apply mpi_gatherv at this step 
-
-     auto& recvcounts = this->template get<vector<int>>("recvcounts");
-     auto& recvdispls = this->template get<vector<int>>("recvdispls");
-
      int tot_size = norb*(norb+1)/2  ;
-
-     vector<CU> gf_ip_store(tot_size,{0.,0.}) ;
-     vector<CU> gf_ea_store(tot_size,{0.,0.}) ;
-     int send_count = recvcounts[arena.rank] ;
-
-//     arena.comm().Allgather(&gf_ip_temp[0], send_count, &gf_ip_store[0], &recvcounts[0], &recvdispls[0], MPI_DOUBLE_COMPLEX) ;
-     MPI_Allgatherv(gf_ip_temp.data(), send_count, MPI_DOUBLE_COMPLEX, gf_ip_store.data(), recvcounts.data(), recvdispls.data(), MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD) ;
-     MPI_Allgatherv(gf_ea_temp.data(), send_count, MPI_DOUBLE_COMPLEX, gf_ea_store.data(), recvcounts.data(), recvdispls.data(), MPI_DOUBLE_COMPLEX, MPI_COMM_WORLD) ;
 
      if (gf_type == 1){
       for (int p = 0; p < norb ;p++){
         for (int q = p; q < norb ;q++){
          if (q == p){
-           gf_total[p*norb+q] = gf_ip_store[(p*norb+q)-p*(p+1)/2] + gf_ea_store[(p*norb+q)-p*(p+1)/2] ; 
+           gf_total[p*norb+q] = gf_ip_temp[(p*norb+q)-p*(p+1)/2] + gf_ea_temp[(p*norb+q)-p*(p+1)/2] ; 
           }
           else{
-            gf_total[p*norb+q]  = 0.5*( gf_ip_store[(p*norb+q)-p*(p+1)/2] - gf_ip_store[(p*norb+p)-p*(p+1)/2] - gf_ip_store[(q*norb+q)-q*(q+1)/2]) ; 
-            gf_total[p*norb+q] += 0.5*( gf_ea_store[(p*norb+q)-p*(p+1)/2] - gf_ea_store[(p*norb+p)-p*(p+1)/2] - gf_ea_store[(q*norb+q)-q*(q+1)/2]) ; 
+            gf_total[p*norb+q]  = 0.5*( gf_ip_temp[(p*norb+q)-p*(p+1)/2] - gf_ip_temp[(p*norb+p)-p*(p+1)/2] - gf_ip_temp[(q*norb+q)-q*(q+1)/2]) ; 
+            gf_total[p*norb+q] += 0.5*( gf_ea_temp[(p*norb+q)-p*(p+1)/2] - gf_ea_temp[(p*norb+p)-p*(p+1)/2] - gf_ea_temp[(q*norb+q)-q*(q+1)/2]) ; 
           }
 // symmetrize gf_total   
             gf_total[q*norb+p] = gf_total[p*norb+q] ; 
@@ -649,7 +570,7 @@ class CCSDSIGMA: public Task
      else {
       for (int p = 0; p < norb ;p++){
         for (int q = 0; q < norb ;q++){
-          gf_total[p*norb+q] = gf_ip_store[(p*norb+q)-p*(p+1)/2] + gf_ea_store[(p*norb+q)-p*(p+1)/2] ; 
+          gf_total[p*norb+q] = gf_ip_temp[(p*norb+q)-p*(p+1)/2] + gf_ea_temp[(p*norb+q)-p*(p+1)/2] ; 
           gf_total[q*norb+p] = gf_total[p*norb+q] ; 
         }
       } 
@@ -984,14 +905,15 @@ static const char* spec = R"(
 
     npoint int,
     omega_min double ?
-    double -10.0,
+        double -10.0,
     omega_max double ?
-    double 10.0,
+        double 10.0,
     impurities ?
-    int 1,
+        int 0,
     eta ?
-    double .001,
-    beta double, 
+        double .001,
+    beta ?
+        double 100, 
     grid?
         enum{ imaginary, real },
     gftype?

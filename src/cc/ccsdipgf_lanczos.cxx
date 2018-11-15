@@ -29,13 +29,10 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
         typedef U X ; 
         typedef complex_type_t<U> CU;
         Config lanczos_config;
-        int orbital;
-        int orbstart;
-        int orbend;
+        int element_start ;
+        int element_end ;
         vector<CU> omegas;
         CU omega;
-        vector<U> old_value ;
-        string orb_range ;
 
     public:
         CCSDIPGF_LANCZOS(const string& name, Config& config)
@@ -45,39 +42,10 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             reqs.emplace_back("ccsd.T", "T");
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
-            this->addProduct(Product("counter", "recvcounts", reqs));
-            this->addProduct(Product("displacement", "recvdispls", reqs));
             this->addProduct(Product("ccsd.ipgf", "gf_ip", reqs));
-            this->addProduct(Product("ccsd.ipalpha", "alpha_ip", reqs));
-            this->addProduct(Product("ccsd.ipbeta", "beta_ip", reqs));
-            this->addProduct(Product("ccsd.ipgamma", "gamma_ip", reqs));
-            this->addProduct(Product("ccsd.ipnorm", "norm_ip", reqs));
-            orbital = config.get<int>("orbital");
-            double from = config.get<double>("omega_min");
-            double to = config.get<double>("omega_max");
-            int n = config.get<double>("npoint");
-            double eta = config.get<double>("eta");
-            double beta = config.get<double>("beta");
-            string grid_type = config.get<string>("grid");
-            orb_range = config.get<string>("orbital_range");
 
-            double delta = (to-from)/max(1,n-1);
-            for (int i = 0;i < n;i++){
-             if (grid_type == "real") omegas.emplace_back(from+delta*i, eta);
-             if (grid_type == "imaginary") omegas.emplace_back(0.,(2.0*i+1)*M_PI/beta);
-            }
-
-            ifstream ifs("wlist_sub.txt");
-            if (ifs){
-            omegas.clear() ; 
-            string line;
-            while (getline(ifs, line))
-            {
-             U val;
-             istringstream(line) >> val;
-             omegas.emplace_back(0.,val);
-            }
-           }
+            element_start = config.get<int>("element_start");
+            element_end = config.get<int>("element_end");
         }
 
         bool run(TaskDAG& dag, const Arena& arena)
@@ -95,12 +63,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             int nA = vrt.nalpha[0];
             int na = vrt.nbeta[0];
             int nvec_lanczos; 
-            CU value ;
-            CU value1 ;
-            int nr_tasks ;
-            int nsize ;
-            int element_start ;
-            int element_end ;
             int orbleft ;
             int orbright ;
 
@@ -109,17 +71,14 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             auto& T = this->template get<ExcitationOperator  <U,2>>("T");
             auto& L = this->template get<DeexcitationOperator<U,2>>("L");
 
+            vector<vector<U>> alpha_ip ;
+            vector<vector<U>> beta_ip ;
+            vector<vector<U>> gamma_ip ;
+            vector<U> norm_ip ;
+
            /* vector LL means Left Lanczos and RL means Right Lanczos
             */
 
-            auto& recvcounts = this-> put("recvcounts", new vector<int>) ;
-            auto& recvdispls = this-> put("recvdispls", new vector<int>) ;
-            auto& gf_ip = this-> put("gf_ip", new vector<vector<vector<CU>>>) ;
-            auto& alpha_ip = this-> put("alpha_ip", new vector<vector<U>>) ;
-            auto& beta_ip = this-> put("beta_ip", new vector<vector<U>>) ;
-            auto& gamma_ip = this-> put("gamma_ip", new vector<vector<U>>) ;
-            auto& norm_ip = this-> put("norm_ip", new vector<U>) ;
-            
             SpinorbitalTensor<U> Dij("D(ij)", arena, group, {vrt,occ}, {0,1}, {0,1});
             SpinorbitalTensor<U> Gijak("G(ij,ak)", arena, group, {vrt,occ}, {0,2}, {1,1});
 
@@ -130,95 +89,27 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
             Gijak["ijak"] = L(2)["ijae"]*T(1)["ek"];
 
-            if (orb_range == "full"){ 
-             nr_tasks =  (nI+nA)*((nI+nA)+1)/2 ;
-             nsize = int(floor(nr_tasks/arena.size)) ; 
+            this->log(arena) << "element start and element end for each process " << element_start << " " << element_end << endl ; 
+             alpha_ip.resize(element_end-element_start+1) ;
+             beta_ip.resize(element_end-element_start+1) ;
+             gamma_ip.resize(element_end-element_start+1) ;
 
-             element_start = arena.rank*nsize ;
-             if (arena.rank < (arena.size-1)) {
-               element_end = element_start + nsize ;
-             } else {
-               element_end = element_start+nr_tasks - (nsize*(arena.size-1)) ;
+             vector<int> array1((nI+nA)*((nI+nA)+1)/2);
+             vector<int> array2((nI+nA)*((nI+nA)+1)/2);
+             vector< pair <int,int> > get_index ; 
+
+             int x = 0 ; 
+             for (int orbleft = 0; orbleft < (nI+nA) ; orbleft++){   
+                for (int orbright = orbleft; orbright < (nI+nA) ; orbright++){   
+                    array1[x] = orbleft ;
+                    array2[x] = orbright ;
+                    x += 1 ;
+                }
              }
 
-             recvcounts.resize(arena.size) ;
-             recvdispls.resize(arena.size) ;
-
-             cout << "element start and elemnet end for each process " << element_start << " " << element_end << endl ; 
-
-             for (int i = 0 ; i < (arena.size - 1) ; i++){
-                recvcounts[i] = i * nsize + nsize ; 
+             for (int i = 0; i < (nI+nA)*((nI+nA)+1)/2 ; i++){   
+                 get_index.push_back( make_pair(array1[i],array2[i]) );
              }
-
-              recvcounts[arena.size - 1] = (arena.size - 1) + nr_tasks - (nsize*(arena.size-1)) ; 
-              
-              recvdispls [0] = 0 ;
-               
-             for (int i = 1 ; i < arena.size ; i++){
-                recvdispls[i] = recvdispls[i-1] + recvcounts[i-1] ; 
-             }
-
-             gf_ip.resize(maxspin);
-//             alpha_ip.resize(orbend*(orbend+1)/2) ;
-//             beta_ip.resize(orbend*(orbend+1)/2) ;
-//             gamma_ip.resize(orbend*(orbend+1)/2) ;
-
-             alpha_ip.resize(element_end-element_start) ;
-             beta_ip.resize(element_end-element_start) ;
-             gamma_ip.resize(element_end-element_start) ;
-
-            for (int nspin = 0;nspin < maxspin;nspin++){
-              gf_ip[nspin].resize(omegas.size());
-             }  
-
-            for (int nspin = 0;nspin < maxspin;nspin++) {
-              for (int i = 0;i < omegas.size();i++) {
-                gf_ip[nspin][i].resize(element_end-element_start);
-               }
-             }
-           } 
-
-           if (orb_range == "diagonal") 
-           { orbstart = orbital-1 ;
-             orbend = orbital;  
-             gf_ip.resize(maxspin);
-
-             alpha_ip.resize(1) ;
-             beta_ip.resize(1) ;
-             gamma_ip.resize(1) ;
-
-            for (int nspin = 0;nspin < maxspin;nspin++){
-              gf_ip[nspin].resize(omegas.size());
-             }  
-            for (int nspin = 0;nspin < maxspin;nspin++){
-              for (int i = 0;i < omegas.size();i++){
-                gf_ip[nspin][i].resize(1);
-               }
-             }
-           }
-
-          vector<CU> spec_func(omegas.size()) ;
-          vector<int> array1(nr_tasks);
-          vector<int> array2(nr_tasks);
-          vector< pair <int,int> > get_index ; 
-
-          int x = 0 ; 
-          for (int orbleft = 0; orbleft < (nI+nA) ; orbleft++){   
-           for (int orbright = orbleft; orbright < (nI+nA) ; orbright++){   
-             array1[x] = orbleft ;
-             array2[x] = orbright ;
-             x += 1 ;
-           }
-          }
-
-          for (int i = 0; i < (nI+nA)*((nI+nA)+1)/2 ; i++){   
-            get_index.push_back( make_pair(array1[i],array2[i]) );
-          }
-
-          if (arena.rank ==0){
-            std::ifstream iffile("gomega_ip.dat");
-            if (iffile) remove("gomega_ip.dat");
-          }
 
         int uppertriangle ;
 
@@ -226,20 +117,12 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
          uppertriangle = 0 ;
 
-//       for (int orbleft = orbstart; orbleft < orbend ; orbleft++){   
-//         for (int orbright = orbleft; orbright < orbend ; orbright++){   
-
          for (int orbs = element_start; orbs < element_end ; orbs++){   
 
-            old_value.clear() ;             
+            orbleft = get_index[orbs].first ;
+            orbright = get_index[orbs].second ;
 
-              orbleft = get_index[orbs].first ;
-              orbright = get_index[orbs].second ;
-//            orbleft = array1[orbs] ;
-//            orbright = array2[orbs] ;
-
-//            this->log(arena) << "Computing Green's function element: " << orbleft << " "<< orbright << endl ;
-            cout << "Computing Green's function element " << orbleft << " "<< orbright << " in process rank " << arena.rank << endl ;
+            this->log(arena) << "Computing Green's function element: " << orbleft << " "<< orbright << endl ;
 
             bool isalpha_right = false;
             bool isvrt_right = false;
@@ -306,19 +189,17 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
             CTFTensor<U>& tensor1 = ap({0,0}, {isvrt_right && isalpha_right, !isvrt_right && isalpha_right})({0});
                 tensor1.writeRemoteData(pair_right);
-//          if (arena.rank == 0)
-//              tensor1.writeRemoteData(pair_right);
-//          else
-//                tensor1.writeRemoteData();
+            if (arena.rank == 0)
+                tensor1.writeRemoteData(pair_right);
+            else
+                tensor1.writeRemoteData();
 
             CTFTensor<U>& tensor2 = apt({isvrt_left && isalpha_left, !isvrt_left && isalpha_left}, {0,0})({0});
                 tensor2.writeRemoteData(pair_left);
-//          if (arena.rank == 0)
-//              tensor2.writeRemoteData(pair_left);
-//          else
-//                tensor2.writeRemoteData();
-
-            cout << "Process rank " << arena.rank << " "<<  aquarius::abs(scalar(ap*ap)) << endl ;
+            if (arena.rank == 0)
+                tensor2.writeRemoteData(pair_left);
+            else
+                tensor2.writeRemoteData();
 
             if ((isvrt_right) && (isvrt_left))
             {
@@ -428,7 +309,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               }
             }
 
-
               auto& D = this->puttmp("D", new Denominator<U>(H));
            
               int number_of_vectors = nI*nI*nA + nI ; 
@@ -456,92 +336,54 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               beta_ip[uppertriangle].resize(nvec_lanczos) ;
               gamma_ip[uppertriangle].resize(nvec_lanczos) ;
 
-  /*Define full trdiagonal matrix 
-   */  
-         vector<U> Tdiag(nvec_lanczos*nvec_lanczos);
-
-         for (int i=0 ; i < nvec_lanczos ; i++){
-          for (int j=0 ; j < nvec_lanczos ; j++){
-            if (j==i) Tdiag[i*nvec_lanczos + j] = alpha[i] ; 
-            if (j==(i-1))Tdiag[i*nvec_lanczos + j] = beta[j];
-            if (j==(i+1))Tdiag[i*nvec_lanczos + j] = gamma[i];
-          }
-         }    
-
-         for (int i=0 ; i < nvec_lanczos ; i++){
-            alpha_ip[uppertriangle][i] = alpha[i] ;
-            beta_ip[uppertriangle][i] = beta[i] ;
-            gamma_ip[uppertriangle][i] = gamma[i] ;
-         }
-
-  /*
-   * Diagonalize the tridiagonal matrix to see if that produces EOM-IP values..
-   */
-            vector<U> l(nvec_lanczos*nvec_lanczos);
-            vector<CU> s_tmp(nvec_lanczos);
-            vector<U> vr_tmp(nvec_lanczos*nvec_lanczos);
-
-            int info = geev('N', 'V', nvec_lanczos, Tdiag.data(), nvec_lanczos,
-                        s_tmp.data(), l.data(), nvec_lanczos,
-                        vr_tmp.data(), nvec_lanczos);
-            if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
-
-            for (int i=0 ; i < nvec_lanczos ; i++){
-//              printf("real eigenvalues: %.15f\n", s_tmp[i].real());
-//              printf("imaginary eigenvalues: %.15f\n", s_tmp[i].imag());
-             }
- 
-            U piinverse = 1/M_PI ;
-
-            int omega_counter = 0 ;
-
-            for (auto& o : omegas)
-            {
-              value  = {0.,0.} ;
-              value1 = {0.,0.} ;
-
-              CU alpha_temp ;
-              CU beta_temp ;
-              CU gamma_temp ;
-              CU com_one(1.,0.) ;
-              omega = {o.real(),o.imag()} ;
-//            omega = {-o.real(),o.imag()} ;
-
-//             this->log(arena) << "Computing Green's function at " << fixed << setprecision(6) << o << endl ;
-
-            /*Evaluate continued fraction 
-             */
-
-             for(int i=(nvec_lanczos-1);i >= 0;i--){  
-              alpha_temp = {alpha[i],0.} ;
-              beta_temp  = {beta[i],0.} ;
-              gamma_temp = {gamma[i],0.} ;
-
-              value = (com_one)/(omega + alpha_temp - beta_temp*gamma_temp*value1) ;                 
-              value1 = value ;
-             }
-
-             if (orb_range == "full") gf_ip[nspin][omega_counter][uppertriangle] = value*norm*norm ;
-             if (orb_range == "diagonal") gf_ip[nspin][omega_counter][0] = value*norm*norm ;
-
-             if(orbright==orbleft) spec_func[omega_counter] += value*norm*norm ;
-
-              omega_counter += 1 ;
-             }
-             uppertriangle +=1 ;
+              for (int i=0 ; i < nvec_lanczos ; i++){
+                 alpha_ip[uppertriangle][i] = alpha[i] ;
+                 beta_ip[uppertriangle][i] = beta[i]   ;
+                 gamma_ip[uppertriangle][i] = gamma[i] ;
+              }
+              uppertriangle +=1 ;
           }
         }
 
          if (arena.rank == 0)
          {
-             std::ofstream gomega;
-             gomega.open ("gomega_ip.dat", ofstream::out|std::ios::app);
+             stringstream stream1;
+             stream1 << "alpha_ip_"<<element_start<<"_"<<element_end<< ".txt";
+             string fileName1 = stream1.str();
+             std::ofstream alphafile;
+             alphafile.open (fileName1, ofstream::out);
 
-             for (int i=0 ; i < omegas.size() ; i++){
-               gomega << omegas[i].real() << " " << -1/M_PI*spec_func[i].imag() << std::endl ;
+             stringstream stream2;
+             stream2 << "beta_ip_"<<element_start<<"_"<<element_end<< ".txt";
+             string fileName2 = stream2.str();
+             std::ofstream betafile;
+             betafile.open (fileName2, ofstream::out);
+
+             stringstream stream3;
+             stream3 << "gamma_ip_"<<element_start<<"_"<<element_end<< ".txt";
+             string fileName3 = stream3.str();
+             std::ofstream gammafile;
+             gammafile.open (fileName3, ofstream::out);
+
+             stringstream stream4;
+             stream4 << "norm_ip_"<<element_start<<"_"<<element_end<< ".txt";
+             string fileName4 = stream4.str();
+             std::ofstream normfile;
+             normfile.open (fileName4, ofstream::out);
+
+             for (int i=element_start ; i < element_end ; i++){
+                for (int j=0 ; j < alpha_ip[0].size() ; j++){
+                   alphafile << i << " " << j << " " << setprecision(12) <<  alpha_ip[i-element_start][j] << endl ;
+                   betafile << i << " " << j << " " << setprecision(12) << beta_ip[i-element_start][j] << endl ;
+                   gammafile << i << " " << j << " " << setprecision(12) << gamma_ip[i-element_start][j] << endl ;
+                }
+                   normfile << setprecision(12) <<  norm_ip[i-element_start] << endl ;
              }
 
-             gomega.close();
+             alphafile.close();
+             betafile.close();
+             gammafile.close();
+             normfile.close();
          }
             return true;
         }
@@ -574,14 +416,6 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             auto& beta  = this->template gettmp<unique_vector<U>> ("beta");
             auto& gamma = this->template gettmp<unique_vector<U>> ("gamma");
 
-            int n_lanczos; 
-            U value ;
-            U delta_value ;
-            U value1 ;
-            U alpha_temp ;
-            U beta_temp ;
-            U gamma_temp ;
-
 
                 XE[  "e"]    = -0.5*WMNEF["mnfe"]*RL(2)[ "fmn"];
 
@@ -612,30 +446,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             
               lanczos.extrapolate_tridiagonal(RL, LL, Z, Y, D, alpha, beta, gamma);
 
-              value  = 1. ;
-              value1 = 0. ;
-              n_lanczos = alpha.size() ; 
-
-            if (n_lanczos > 2) {
-             for(int i=(n_lanczos-1);i >= 0;i--){  
-              alpha_temp = alpha[i] ;
-              beta_temp  = beta[i] ;
-              gamma_temp = gamma[i] ;
-              value = 1.0/(alpha_temp - beta_temp*gamma_temp*value1) ;                 
-              value1 = value ;
-              }
-             }
-             
-              old_value.push_back(value) ;
-
-              if (n_lanczos <= 2) {
-                delta_value = 1.0 ;}
-              else{
-                delta_value = old_value[n_lanczos-2] - value ;
-              }
               this->conv() = max(pow(beta[beta.size()-1],2), pow(gamma[gamma.size()-1],2));
-//            this->conv() = aquarius::abs(delta_value) ;
-
         }
 
 };
@@ -645,22 +456,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
 
 static const char* spec = R"(
 
-orbital ?
-int 1,
-npoint ?
-int 100,
-omega_min ?
-double -10.0,
-omega_max ?
-double 10.0,
-eta ?
-double .001,
-grid?
-  enum{ real, imaginary },
-orbital_range?
-  enum{ diagonal, full},
-beta?
-   double 100.0 , 
+element_start ?
+   int 0,
+element_end int,
 convergence?
     double 1e-12,
 max_iterations?
