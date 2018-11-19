@@ -131,7 +131,7 @@ am____top_builddir__bin_aquarius_SOURCES_DIST = src/autocc/autocc.cxx \
 	src/cc/ccsdtq_3_density.cxx src/cc/cc4_density.cxx \
 	src/cc/ccsd_t.cxx src/cc/ccsd_t_l.cxx src/cc/ccsd_t_n_opt.cxx \
 	src/cc/ccsd_t_n.cxx src/cc/e_ccsd_t_n.cxx \
-	src/cc/ccsd_tq_n_opt.cxx src/cc/ccsd_tq_n.cxx src/cc/ccsd.cxx \
+	src/cc/ccsd_tq_n_opt.cxx src/cc/ccsd_tq_n.cxx src/cc/ccsd.cxx src/cc/assemble_files.cxx \
 	src/cc/ccsdipgf.cxx src/cc/ccsdeagf.cxx src/cc/ccsigma.cxx src/cc/ccsdtipgf.cxx src/cc/ccsdt_q.cxx \
 	src/cc/ccsdipgf_lanczos.cxx src/cc/ccsdeagf_lanczos.cxx src/cc/ccsdt_q_l.cxx src/cc/ccsdt_q_n_opt.cxx \
 	src/cc/ccsdt_q_n.cxx src/cc/ccsdt.cxx src/cc/ccsdtq.cxx \
@@ -202,6 +202,7 @@ am___top_builddir__bin_aquarius_OBJECTS = src/autocc/autocc.$(OBJEXT) \
 	src/cc/ccsd_tq_n.$(OBJEXT) src/cc/ccsd.$(OBJEXT) \
 	src/cc/ccsdipgf.$(OBJEXT) src/cc/ccsdtipgf.$(OBJEXT) \
 	src/cc/ccsigma.$(OBJEXT) \
+	src/cc/assemble_files.$(OBJEXT) \
 	src/cc/ccsdeagf.$(OBJEXT) \
 	src/cc/ccsdipgf_lanczos.$(OBJEXT) \
 	src/cc/ccsdeagf_lanczos.$(OBJEXT) \
@@ -473,7 +474,7 @@ __top_builddir__bin_aquarius_SOURCES = src/autocc/autocc.cxx \
 	src/cc/ccsdtq_3_density.cxx src/cc/cc4_density.cxx \
 	src/cc/ccsd_t.cxx src/cc/ccsd_t_l.cxx src/cc/ccsd_t_n_opt.cxx \
 	src/cc/ccsd_t_n.cxx src/cc/e_ccsd_t_n.cxx \
-	src/cc/ccsd_tq_n_opt.cxx src/cc/ccsd_tq_n.cxx src/cc/ccsd.cxx \
+	src/cc/ccsd_tq_n_opt.cxx src/cc/ccsd_tq_n.cxx src/cc/ccsd.cxx src/cc/assemble_files.cxx \
 	src/cc/ccsdipgf.cxx src/cc/ccsdeagf.cxx src/cc/ccsigma.cxx src/cc/ccsdtipgf.cxx src/cc/ccsdt_q.cxx \
         src/cc/ccsdipgf_lanczos.cxx src/cc/ccsdeagf_lanczos.cxx src/cc/ccsdt_q_l.cxx src/cc/ccsdt_q_n_opt.cxx \
 	src/cc/ccsdt_q_n.cxx src/cc/ccsdt.cxx src/cc/ccsdtq.cxx \
@@ -687,6 +688,8 @@ src/cc/ccsdipgf.$(OBJEXT): src/cc/$(am__dirstamp) \
 src/cc/ccsdeagf.$(OBJEXT): src/cc/$(am__dirstamp) \
 	src/cc/$(DEPDIR)/$(am__dirstamp)
 src/cc/ccsigma.$(OBJEXT): src/cc/$(am__dirstamp) \
+	src/cc/$(DEPDIR)/$(am__dirstamp)
+src/cc/assemble_files.$(OBJEXT): src/cc/$(am__dirstamp) \
 	src/cc/$(DEPDIR)/$(am__dirstamp)
 src/cc/ccsdipgf_lanczos.$(OBJEXT): src/cc/$(am__dirstamp) \
 	src/cc/$(DEPDIR)/$(am__dirstamp)
@@ -1008,6 +1011,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@src/cc/$(DEPDIR)/ccsdipgf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/cc/$(DEPDIR)/ccsdeagf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/cc/$(DEPDIR)/ccsigma.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@src/cc/$(DEPDIR)/assemble_files.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/cc/$(DEPDIR)/ccsdipgf_lanczos.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/cc/$(DEPDIR)/ccsdeagf_lanczos.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@src/cc/$(DEPDIR)/ccsdt.Po@am__quote@

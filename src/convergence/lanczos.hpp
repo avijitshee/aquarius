@@ -84,10 +84,9 @@ class Lanczos : public task::Destructible
         }
 
     public:
-        Lanczos(const input::Config& config, const int nvec)
+        Lanczos(const input::Config& config)
         {
             parse(config);
-            reset(nvec);
         }
 
         void extrapolate_tridiagonal(op::ExcitationOperator  <T,1,2>& c_r,op::DeexcitationOperator<V,1,2>& c_l,op::ExcitationOperator  <T,1,2>& hc_r, op::DeexcitationOperator<V,1,2>& hc_l, const op::Denominator<T>& D, unique_vector<T>& alpha, unique_vector<T>& beta, unique_vector<T>& gamma)
@@ -263,11 +262,6 @@ class Lanczos : public task::Destructible
 //          printf("print alpha: %.10f \n",alpha[nextrap-1]);
 //          printf("print beta: %.10f \n",beta[nextrap-1]);
 //          printf("print gamma: %.10f \n",gamma[nextrap-1]);
-        }
-
-        void reset(int nvec = 1)
-        {
-            init(nvec);
         }
 };
 
