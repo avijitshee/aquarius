@@ -329,11 +329,11 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               beta_ea[uppertriangle].resize(nvec_lanczos) ;
               gamma_ea[uppertriangle].resize(nvec_lanczos) ;
 
-             for (int i=0 ; i < nvec_lanczos ; i++){
-                alpha_ea[uppertriangle][i] = alpha[i] ;
-                beta_ea[uppertriangle][i] = beta[i] ;
-                gamma_ea[uppertriangle][i] = gamma[i] ;
-             }
+              for (int i=0 ; i < nvec_lanczos ; i++){
+                 alpha_ea[uppertriangle][i] = alpha[i] ;
+                 beta_ea[uppertriangle][i] = beta[i] ;
+                 gamma_ea[uppertriangle][i] = gamma[i] ;
+              }
               uppertriangle +=1 ;
             }
           } 

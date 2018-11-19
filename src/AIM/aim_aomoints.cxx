@@ -54,6 +54,8 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
 
     SymmetryBlockedTensor<U> X("X", arena, PointGroup::C1(), 4, {N,N,N,N}, {NS,NS,NS,NS}, false);
 
+   if (arena.rank == 0)
+   {
     vector<tkv_pair<U>> ijklpairs;
 
     ifstream ifs(path);
@@ -68,8 +70,13 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
        countline = ((p*N[0]+k)*N[0]+q)*N[0]+l ;
        ijklpairs.emplace_back(countline,val);
     }
-
     X.writeRemoteData({0,0,0,0},ijklpairs);
+   }
+   else
+   {
+    X.writeRemoteData({0,0,0,0});
+   } 
+
 
     auto& H = this->put("H", new TwoElectronOperator<U>("H", OneElectronOperator<U>("f", occ, vrt, Fa, Fb)));
 
@@ -79,7 +86,6 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     CTFTensor<U>& VAIBJ = H.getAIBJ()({1,0},{1,0})({0,0,0,0});
     CTFTensor<U>& VABCI = H.getABCI()({1,0},{1,0})({0,0,0,0});
     CTFTensor<U>& VABCD = H.getABCD()({1,0},{1,0})({0,0,0,0});
-
 
      {
          CTFTensor<U> tmp("tmp", arena, 4, {nA[0],N[0],N[0],N[0]}, {NS,NS,NS,NS});
