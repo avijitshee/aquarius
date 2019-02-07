@@ -20,6 +20,7 @@ AIMTask::AIMTask(const string& name, input::Config& config)
 bool AIMTask::run(task::TaskDAG& dag, const Arena& arena)
 {
     put("aim", new AIM<double>::AIM("aim", config));
+    return true;
 }
 
 template <typename U>

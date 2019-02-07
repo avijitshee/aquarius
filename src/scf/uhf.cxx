@@ -181,6 +181,11 @@ bool UHF<T>::run(TaskDAG& dag, const Arena& arena)
 
     for (int i = 0;i < group.getNumIrreps();i++)
     {
+        for (int j = (occ_alpha[i]-2) ;j < (occ_alpha[i]+2) ;j++)
+        {
+         printf("orbital#:  %d energy: %10f %10f\n",j, E_alpha[i][j], E_beta[i][j]);
+        }
+
         sort(E_beta[i].begin(), E_beta[i].end());
         Eb[i].assign(E_beta[i].begin()+nfrozen_beta[i], E_beta[i].end());
     }

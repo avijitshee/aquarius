@@ -90,9 +90,9 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             Gijak["ijak"] = L(2)["ijae"]*T(1)["ek"];
 
             this->log(arena) << "element start and element end for each process " << element_start << " " << element_end << endl ; 
-             alpha_ip.resize(element_end-element_start+1) ;
-             beta_ip.resize(element_end-element_start+1) ;
-             gamma_ip.resize(element_end-element_start+1) ;
+             alpha_ip.resize(element_end-element_start) ;
+             beta_ip.resize(element_end-element_start) ;
+             gamma_ip.resize(element_end-element_start) ;
 
              vector<int> array1((nI+nA)*((nI+nA)+1)/2);
              vector<int> array2((nI+nA)*((nI+nA)+1)/2);
@@ -371,19 +371,27 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
              std::ofstream normfile;
              normfile.open (fileName4, ofstream::out);
 
+             stringstream stream5;
+             stream5 << "lanczos_ip_"<<element_start<<"_"<<element_end<< ".txt";
+             string fileName5 = stream5.str();
+             std::ofstream lanczosipfile;
+             lanczosipfile.open (fileName5, ofstream::out);
+
              for (int i=element_start ; i < element_end ; i++){
-                for (int j=0 ; j < alpha_ip[0].size() ; j++){
+                for (int j=0 ; j < alpha_ip[i-element_start].size() ; j++){
                    alphafile << i << " " << j << " " << setprecision(12) <<  alpha_ip[i-element_start][j] << endl ;
                    betafile << i << " " << j << " " << setprecision(12) << beta_ip[i-element_start][j] << endl ;
                    gammafile << i << " " << j << " " << setprecision(12) << gamma_ip[i-element_start][j] << endl ;
                 }
                    normfile << setprecision(12) <<  norm_ip[i-element_start] << endl ;
+                   lanczosipfile << i << " " << alpha_ip[i-element_start].size() << endl ;
              }
 
              alphafile.close();
              betafile.close();
              gammafile.close();
              normfile.close();
+             lanczosipfile.close();
          }
             return true;
         }

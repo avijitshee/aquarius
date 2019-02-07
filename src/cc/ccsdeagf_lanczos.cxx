@@ -85,9 +85,9 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
             Gieab["amef"]  = -L(2)["nmef"]*T(1)[  "an"];
 
-            alpha_ea.resize(element_end-element_start+1) ;
-            beta_ea.resize(element_end-element_start+1) ;
-            gamma_ea.resize(element_end-element_start+1) ;
+            alpha_ea.resize(element_end-element_start) ;
+            beta_ea.resize(element_end-element_start) ;
+            gamma_ea.resize(element_end-element_start) ;
 
             vector<int> array1((nI+nA)*((nI+nA)+1)/2);
             vector<int> array2((nI+nA)*((nI+nA)+1)/2);
@@ -365,19 +365,27 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
              std::ofstream normfile;
              normfile.open (fileName4, ofstream::out);
 
+             stringstream stream5;
+             stream5 << "lanczos_ea_"<<element_start<<"_"<<element_end<< ".txt";
+             string fileName5 = stream5.str();
+             std::ofstream lanczoseafile;
+             lanczoseafile.open (fileName5, ofstream::out);
+
              for (int i=element_start ; i < element_end ; i++){
-                for (int j=0 ; j < alpha_ea[0].size() ; j++){
+                for (int j=0 ; j < alpha_ea[i-element_start].size() ; j++){
                    alphafile << i << " " << j << " " << setprecision(12) <<  alpha_ea[i-element_start][j] << endl ;
                    betafile << i << " " << j << " " << setprecision(12) << beta_ea[i-element_start][j] << endl ;
                    gammafile << i << " " << j << " " << setprecision(12) << gamma_ea[i-element_start][j] << endl ;
                 }
                    normfile << setprecision(12) <<  norm_ea[i-element_start] << endl ;
+                   lanczoseafile << i << " " << alpha_ea[i-element_start].size() << endl ;
              }
 
              alphafile.close();
              betafile.close();
              gammafile.close();
              normfile.close();
+             lanczoseafile.close();
          }
 
             return true;

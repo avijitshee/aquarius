@@ -1,5 +1,4 @@
-#include "uhf_modelH.hpp"
-#include "aim.hpp"
+#include "pyscf_import.hpp"
 #include "util/global.hpp"
 
 using namespace aquarius::input;
@@ -12,20 +11,18 @@ using namespace aquarius::symmetry;
 
 namespace aquarius
 {
-namespace aim
+namespace scf
 {
 template <typename T>
-uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
+pyscf_import<T>::pyscf_import(const string& name, Config& config)
 : Iterative<T>(name, config), frozen_core(config.get<bool>("frozen_core")),
-  path(config.get<string>("filename")), diis(config.get("diis"), 2)
+  path_focka(config.get<string>("filename_focka")),path_fockb(config.get<string>("filename_fockb")),path_overlap(config.get<string>("filename_overlap")),diis(config.get("diis"), 2)
 {
     damp_density = config.get<double>("damping_density");
     vector<Requirement> reqs;
-    reqs += Requirement("aim", "aim");
-    reqs += Requirement("aim_S", "S");
-    reqs += Requirement("aim_1eints", "H");
-    reqs += Requirement("Da", "Da");
-    reqs += Requirement("Db", "Db");
+    reqs += Requirement("molecule", "molecule");
+    reqs += Requirement("ovi", "S");
+    reqs += Requirement("1ehamiltonian", "H");
     this->addProduct(Product("double", "energy", reqs));
     this->addProduct(Product("double", "convergence", reqs));
     this->addProduct(Product("double", "S2", reqs));
@@ -36,22 +33,29 @@ uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
     this->addProduct(Product("Eb", "Eb", reqs));
     this->addProduct(Product("Fa", "Fa", reqs));
     this->addProduct(Product("Fb", "Fb", reqs));
+    this->addProduct(Product("Da", "Da", reqs));
+    this->addProduct(Product("Db", "Db", reqs));
+    this->addProduct(Product("S", "S", reqs));
 }
 
 template <typename T>
-bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
+bool pyscf_import<T>::run(TaskDAG& dag, const Arena& arena)
 {
-   auto& aim =this->template get<AIM <T>>("aim");
-   int norb = aim.getNumOrbitals();
-   int nalpha = aim.getNumAlphaElectrons();
-   int nbeta = aim.getNumBetaElectrons();
-   int nirreps = aim.getNumIrreps() ;
+   const Molecule& molecule = this->template get<Molecule>("molecule");
+   const PointGroup& group = molecule.getGroup();
+   int norb = molecule.getNumOrbitals()[0];
+   int nalpha = molecule.getNumAlphaElectrons();
+   int nbeta = molecule.getNumBetaElectrons();
+   int nirreps = group.getNumIrreps() ;
 
    vector<int> shapeNN = {NS,NS};
    vector<vector<int>> sizenn  = {{norb},{norb}};
 
     this->put("Fa", new SymmetryBlockedTensor<T>("Fa", arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
     this->put("Fb", new SymmetryBlockedTensor<T>("Fb", arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
+    this->put("Da", new SymmetryBlockedTensor<T>("Da", arena, PointGroup::C1(), 2, sizenn, shapeNN, true));
+    this->put("Db", new SymmetryBlockedTensor<T>("Db", arena, PointGroup::C1(), 2, sizenn, shapeNN, true));
+//    this->put("S", new SymmetryBlockedTensor<T>("S", arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
 
     this->puttmp("dF",     new SymmetryBlockedTensor<T>("dF",     arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
     this->puttmp("Ca",     new SymmetryBlockedTensor<T>("Ca",     arena, PointGroup::C1(), 2, sizenn, shapeNN, false));
@@ -71,7 +75,7 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
         E_alpha[i].resize(norb);
         E_beta[i].resize(norb);
     }
-
+//    get_overlap(arena);
     calcSMinusHalf();
 
     CTF_Timer_epoch ep(this->name.c_str());
@@ -137,6 +141,11 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
         occ_beta[i] -= nfrozen_beta[i];
     }
 
+    for (int i = 0;i < nirreps;i++){
+      cout <<  "occupied alpha electrons " << occ_alpha[i] << endl ; 
+      cout <<  "occupied beta electrons " << occ_beta[i] << endl ; 
+    }
+
     vector<int> zero(norb, 0);
     this->put("occ", new MOSpace<T>(SymmetryBlockedTensor<T>("CI", this->template gettmp<SymmetryBlockedTensor<T>>("Ca"),
                                                              {zero,nfrozen_alpha},
@@ -181,13 +190,14 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 }
 
 template <typename T>
-void uhf_modelh<T>::iterate(const Arena& arena)
+void pyscf_import<T>::iterate(const Arena& arena)
 {
-   auto& aim =this->template get<AIM <T>>("aim");
-   int norb = aim.getNumOrbitals();
-   int nalpha = aim.getNumAlphaElectrons();
-   int nbeta = aim.getNumBetaElectrons();
-   int nirreps = aim.getNumIrreps() ;
+   const Molecule& molecule = this->template get<Molecule>("molecule");
+   const PointGroup& group = molecule.getGroup();
+   int norb = molecule.getNumOrbitals()[0];
+   int nalpha = molecule.getNumAlphaElectrons();
+   int nbeta = molecule.getNumBetaElectrons();
+   int nirreps = group.getNumIrreps() ;
 
     buildFock();
     DIISExtrap();
@@ -226,6 +236,7 @@ void uhf_modelh<T>::iterate(const Arena& arena)
     Logger::log(arena) << "Iteration " << this->iter() << " occupation = " << occ_alpha << ", " << occ_beta << endl;
 
     calcDensity();
+//    diagonalizeDensity();
 
     auto& dDa = this->template gettmp<SymmetryBlockedTensor<T>>("dDa");
     auto& dDb = this->template gettmp<SymmetryBlockedTensor<T>>("dDb");
@@ -245,13 +256,76 @@ void uhf_modelh<T>::iterate(const Arena& arena)
 }
 
 template <typename T>
-void uhf_modelh<T>::calcSMinusHalf()
+void pyscf_import<T>::get_overlap(const Arena& arena)
 {
-   auto& aim =this->template get<AIM <T>>("aim");
-   const int norb = aim.getNumOrbitals();
-   int nalpha = aim.getNumAlphaElectrons();
-   int nbeta = aim.getNumBetaElectrons();
-   int nirreps = aim.getNumIrreps() ;
+   const Molecule& molecule = this->template get<Molecule>("molecule");
+   const PointGroup& group = molecule.getGroup();
+   const int norb = molecule.getNumOrbitals()[0];
+   int nirrep = group.getNumIrreps() ;
+
+   auto& S = this->template get<SymmetryBlockedTensor<T>>("S");
+
+    vector<vector<T>> overlap(nirrep) ; 
+
+    for (int i = 0;i < nirrep;i++)
+    {
+      overlap[i].resize(norb*norb, (T)0);
+
+    if (arena.rank == 0)
+    {
+      ifstream ifs(path_overlap);
+      string line;
+
+      while (getline(ifs, line))
+      {
+          T val;
+          int p, q;
+          istringstream(line) >> val >> p >> q ;
+
+          overlap[i][(q-1)*norb+(p-1)]  = val; 
+          overlap[i][(p-1)*norb+(q-1)]  = val; 
+      }
+     }
+    }
+
+    for (int i = 0;i < nirrep;i++)
+    {
+        vector<int> irreps(2,i);
+
+        if (arena.rank == 0)
+        {
+            //PROFILE_FLOPS(2*norb[i]*norb[i]);
+            arena.comm().Reduce(overlap[i], MPI_SUM);
+
+            vector<tkv_pair<T>> pairs(norb*norb);
+
+            for (int p = 0;p < norb*norb;p++)
+            {
+                pairs[p].d = overlap[i][p];
+                pairs[p].k = p;
+            }
+
+            S.writeRemoteData(irreps, pairs);
+        }
+        else
+        {
+            //PROFILE_FLOPS(2*norb[i]*norb[i]);
+            arena.comm().Reduce(overlap[i], MPI_SUM, 0);
+
+            S.writeRemoteData(irreps);
+        }
+    }
+}
+
+template <typename T>
+void pyscf_import<T>::calcSMinusHalf()
+{
+   const Molecule& molecule = this->template get<Molecule>("molecule");
+   const PointGroup& group = molecule.getGroup();
+   const int norb = molecule.getNumOrbitals()[0];
+   int nalpha = molecule.getNumAlphaElectrons();
+   int nbeta = molecule.getNumBetaElectrons();
+   int nirreps = group.getNumIrreps() ;
 
     auto& S = this->template get<SymmetryBlockedTensor<T>>("S");
     auto& Smhalf = this->template gettmp<SymmetryBlockedTensor<T>>("S^-1/2");
@@ -309,15 +383,16 @@ void uhf_modelh<T>::calcSMinusHalf()
 }
 
 template <typename T>
-void uhf_modelh<T>::diagonalizeFock()
+void pyscf_import<T>::diagonalizeFock()
 {
-   auto& aim =this->template get<AIM <T>>("aim");
-   const int norb = aim.getNumOrbitals();
-   int nalpha = aim.getNumAlphaElectrons();
-   int nbeta = aim.getNumBetaElectrons();
-   int nirreps = aim.getNumIrreps() ;
+   const Molecule& molecule = this->template get<Molecule>("molecule");
+   const PointGroup& group = molecule.getGroup();
+   const int norb = molecule.getNumOrbitals()[0];
+   int nalpha = molecule.getNumAlphaElectrons();
+   int nbeta = molecule.getNumBetaElectrons();
+   int nirreps = group.getNumIrreps() ;
 
-    auto& S  = this->template get   <SymmetryBlockedTensor<T>>("S");
+    auto& S  = this->template get  <SymmetryBlockedTensor<T>>("S");
     auto& Fa = this->template get   <SymmetryBlockedTensor<T>>("Fa");
     auto& Fb = this->template get   <SymmetryBlockedTensor<T>>("Fb");
     auto& Ca = this->template gettmp<SymmetryBlockedTensor<T>>("Ca");
@@ -333,7 +408,7 @@ void uhf_modelh<T>::diagonalizeFock()
 
     for (int i = 0;i < nirreps;i++)
     {
-        if (norb == 0) continue;
+//        if (norb == 0) continue;
 
         vector<int> irreps(2,i);
 
@@ -365,27 +440,44 @@ void uhf_modelh<T>::diagonalizeFock()
                 assert(info == 0);
 
                 S.arena.comm().Bcast(E);
-                
+
+                vector<pair<real_type_t<T>,int>> E_sort;
                 for (int j = 0;j < norb;j++)
                 {
-                    T sign = 0;
-                    for (int k = 0;k < norb;k++)
-                    {
-                        if (aquarius::abs(fock[k+j*norb]) > 1e-10)
-                        {
-                            sign = (fock[k+j*norb] < 0 ? -1 : 1);
-                            break;
-                        }
-                    }
-                    //PROFILE_FLOPS(norb[i]);
-                    scal(norb, sign, &fock[j*norb], 1);
+                  E_sort.push_back(make_pair(E[j],j));
                 }
 
-                for (int j = 0;j < norb*norb;j++)
+                sort(E_sort.begin(), E_sort.end());
+
+                for (int j = 0;j < norb;j++)
                 {
-                    pairs[j].k = j;
-                    pairs[j].d = fock[j];
+                  cout << E_sort[j].second << endl ;
                 }
+
+//              for (int j = 0;j < norb;j++)
+//              {
+//                  T sign = 0;
+//                  for (int k = 0;k < norb;k++)
+//                  {
+//                      if (aquarius::abs(fock[k+j*norb]) > 1e-10)
+//                      {
+//                          sign = (fock[k+j*norb] < 0 ? -1 : 1);
+//                          break;
+//                      }
+//                  }
+//                  //PROFILE_FLOPS(norb[i]);
+//                  scal(norb, sign, &fock[j*norb], 1);
+//              }
+
+                for (int i = 0;i < norb;i++)
+                {
+                 for (int j = 0;j < norb;j++)
+                  {
+                    pairs[i*norb+j].k = i*norb+j;
+                    pairs[i*norb+j].d = fock[j+E_sort[i].second*norb];
+                  }
+                }
+
                 C.writeRemoteData(irreps, pairs);
             }
         }
@@ -403,13 +495,98 @@ void uhf_modelh<T>::diagonalizeFock()
 }
 
 template <typename T>
-void uhf_modelh<T>::calcS2()
+void pyscf_import<T>::diagonalizeDensity()
 {
-   auto& aim =this->template get<AIM <T>>("aim");
-   const int norb = aim.getNumOrbitals();
-   int nalpha = aim.getNumAlphaElectrons();
-   int nbeta = aim.getNumBetaElectrons();
-   int nirreps = aim.getNumIrreps() ;
+   const Molecule& molecule = this->template get<Molecule>("molecule");
+   const PointGroup& group = molecule.getGroup();
+   const int norb = molecule.getNumOrbitals()[0];
+   int nalpha = molecule.getNumAlphaElectrons();
+   int nbeta = molecule.getNumBetaElectrons();
+   int nirreps = group.getNumIrreps() ;
+
+    auto& Da = this->template get   <SymmetryBlockedTensor<T>>("Da");
+    auto& Db = this->template get   <SymmetryBlockedTensor<T>>("Db");
+    auto& Ca = this->template gettmp<SymmetryBlockedTensor<T>>("Ca");
+    auto& Cb = this->template gettmp<SymmetryBlockedTensor<T>>("Cb");
+
+    for (int i = 0;i < nirreps;i++)
+    {
+        if (norb == 0) continue;
+
+        vector<int> irreps(2,i);
+
+        if (Da.arena.rank == 0)
+        {
+
+            for (int spin : {0,1})
+            {
+                auto& D = (spin == 0 ? Da : Db);
+                auto& C = (spin == 0 ? Ca : Cb);
+
+                int info;
+                vector<T> dens, ctsc(norb*norb);
+                vector<tkv_pair<T>> pairs(norb*norb);
+                vector<T> tmp(norb*norb, 0.);
+                vector<T> occ(norb, 0.) ;
+
+                D.getAllData(irreps, dens, 0);
+                assert(dens.size() == norb*norb);
+                //PROFILE_FLOPS(9*norb[i]*norb[i]*norb[i]);
+
+                cout << "diagonal values of density" << endl ;
+                for (int j = 0 ;j < norb; j++)
+                {
+          //          cout << j << " " << dens[j+j*norb] << endl ;
+                }  
+
+                info = hegv(AXBX, 'V', 'U', norb, dens.data(), norb, tmp.data(), norb, occ.data());
+
+                if (info != 0) throw runtime_error(str("check diagonalization: Info in hegv: %d", info));
+
+                assert(info == 0);
+
+                for (int j = 0;j < norb;j++)
+                {
+                    T sign = 0;
+                    for (int k = 0;k < norb;k++)
+                    {
+                        if (aquarius::abs(dens[k+j*norb]) > 1e-10)
+                        {
+                            sign = (dens[k+j*norb] < 0 ? -1 : 1);
+                            break;
+                        }
+                    }
+                    //PROFILE_FLOPS(norb[i]);
+                    scal(norb, sign, &dens[j*norb], 1);
+                }
+
+                for (int j = 0;j < norb*norb;j++)
+                {
+                    pairs[j].k = j;
+                    pairs[j].d = dens[j];
+                }
+                C.writeRemoteData(irreps, pairs);
+            }
+        }
+        else
+        {
+            Da.getAllData(irreps, 0);
+            Ca.writeRemoteData(irreps);
+            Db.getAllData(irreps, 0);
+            Cb.writeRemoteData(irreps);
+        }
+    }
+}
+
+template <typename T>
+void pyscf_import<T>::calcS2()
+{
+   const Molecule& molecule = this->template get<Molecule>("molecule");
+   const PointGroup& group = molecule.getGroup();
+   const int norb = molecule.getNumOrbitals()[0];
+   int nalpha = molecule.getNumAlphaElectrons();
+   int nbeta = molecule.getNumBetaElectrons();
+   int nirreps = group.getNumIrreps() ;
 
     auto& S = this->template get<SymmetryBlockedTensor<T>>("S"); // this must be set to a unit matrix
 
@@ -437,7 +614,7 @@ void uhf_modelh<T>::calcS2()
 }
 
 template <typename T>
-void uhf_modelh<T>::calcEnergy()
+void pyscf_import<T>::calcEnergy()
 {
 
     auto& H  = this->template get<SymmetryBlockedTensor<T>>("H");
@@ -456,18 +633,20 @@ void uhf_modelh<T>::calcEnergy()
 
     this->energy()  = 0.5*scalar(Da["ab"]*Fa["ab"]);
     this->energy() += 0.5*scalar(Db["ab"]*Fb["ab"]);
+    this->energy() += 1288.9039479060002 ;
     Fa["ab"] -= H["ab"];
     Fb["ab"] -= H["ab"];
 }
 
 template <typename T>
-void uhf_modelh<T>::calcDensity()
+void pyscf_import<T>::calcDensity()
 {
-   auto& aim =this->template get<AIM <T>>("aim");
-   const int norb = aim.getNumOrbitals();
-   int nalpha = aim.getNumAlphaElectrons();
-   int nbeta = aim.getNumBetaElectrons();
-   int nirreps = aim.getNumIrreps() ;
+   const Molecule& molecule = this->template get<Molecule>("molecule");
+   const PointGroup& group = molecule.getGroup();
+   const int norb = molecule.getNumOrbitals()[0];
+   int nalpha = molecule.getNumAlphaElectrons();
+   int nbeta = molecule.getNumBetaElectrons();
+   int nirreps = group.getNumIrreps() ;
 
     auto& dDa = this->template gettmp<SymmetryBlockedTensor<T>>("dDa");
     auto& dDb = this->template gettmp<SymmetryBlockedTensor<T>>("dDb");
@@ -482,99 +661,75 @@ void uhf_modelh<T>::calcDensity()
     /*
      * D[ab] = C[ai]*C[bi]
      */
-    dDa["ab"]  = Da["ab"];
-    dDb["ab"]  = Db["ab"];
+ 
+     dDa["ab"]  = Da["ab"];
+     dDb["ab"]  = Db["ab"];
      Da["ab"]  = Ca_occ["ai"]*Ca_occ["bi"];
      Db["ab"]  = Cb_occ["ai"]*Cb_occ["bi"];
-     damp_density*Da["ab"] += (1.-damp_density)*dDa["ab"] ;
-     damp_density*Db["ab"] += (1.-damp_density)*dDb["ab"] ;
-    dDa["ab"] -= Da["ab"];
-    dDb["ab"] -= Db["ab"];
+     dDa["ab"] -= Da["ab"];
+     dDb["ab"] -= Db["ab"];
 }
 
 template <typename T>
-void uhf_modelh<T>::buildFock()
+void pyscf_import<T>::buildFock()
 {
-   auto& aim =this->template get<AIM <T>>("aim");
-   const int norb = aim.getNumOrbitals();
-   int nirrep = aim.getNumIrreps() ;
+   const Molecule& molecule = this->template get<Molecule>("molecule");
+   const PointGroup& group = molecule.getGroup();
+   const int norb = molecule.getNumOrbitals()[0];
+   int nirrep = group.getNumIrreps() ;
 
-    for (int i = 1;i < nirrep;i++) ;
-
-    auto& H  = this->template get<SymmetryBlockedTensor<T>>("H");
-    auto& Da = this->template get<SymmetryBlockedTensor<T>>("Da");
-    auto& Db = this->template get<SymmetryBlockedTensor<T>>("Db");
     auto& Fa = this->template get<SymmetryBlockedTensor<T>>("Fa");
     auto& Fb = this->template get<SymmetryBlockedTensor<T>>("Fb");
 
-    Arena& arena = H.arena;
+    Arena& arena = Fa.arena;
 
     vector<vector<T>> focka(nirrep), fockb(nirrep);
-    vector<vector<T>> densa(nirrep), densb(nirrep);
-    vector<vector<T>> densab(nirrep);
     T diff ;
 
     for (int i = 0;i < nirrep;i++)
     {
         vector<int> irreps(2,i);
 
-        if (arena.rank == 0)
-        {
-            H.getAllData(irreps, focka[i], 0);
-            assert(focka[i].size() == norb*norb);
-            fockb[i] = focka[i];
-        }
-        else
-        {
-            H.getAllData(irreps, 0);
-            focka[i].resize(norb*norb, (T)0);
-            fockb[i].resize(norb*norb, (T)0);
-        }
-
-        Da.getAllData(irreps, densa[i]);
-        assert(densa[i].size() == norb*norb);
-        Db.getAllData(irreps, densb[i]);
-        assert(densa[i].size() == norb*norb);
-
-
-  /*construct coulomb and exchange part of the fock matrix from 2-e integrals..
-   *focka = (densa+densb)*v_d - densa*v_ex 
-    fockb = (densa+densb)*v_d - densb*v_ex 
-   */
+         focka[i].resize(norb*norb, (T)0);
+         fockb[i].resize(norb*norb, (T)0);
      
     if (arena.rank == 0)
     {
-      ifstream ifs(path);
-      string line;
-
-      if (this->iter() > 0) {
-        densab[i] = densa[i];
-        axpy(norb*norb, 1.0, densb[i].data(), 1, densab[i].data(), 1);
+      ifstream ifs(path_focka);
+      ifstream ifb(path_fockb);
+      string linea,lineb;
 
       int countline = 0 ;
 
-      while (getline(ifs, line))
+      while (getline(ifs, linea))
       {
           countline++ ;
 
           T val;
-          int p, q, k, l;
-          istringstream(line) >> p >> q >> k >> l >> val;
+          int p, q;
+          istringstream(linea) >> val >> p >> q ;
 
-          focka[i][p*norb+q] += densab[i][k*norb+l]*val; 
-          focka[i][p*norb+l] -= densa[i][k*norb+q]*val; 
-          fockb[i][p*norb+q] += densab[i][k*norb+l]*val; 
-          fockb[i][p*norb+l] -= densb[i][k*norb+q]*val; 
+          focka[i][(q-1)*norb+(p-1)]  = val; 
+          focka[i][(p-1)*norb+(q-1)]  = val; 
       }
-      }
-    } else {
-          fill(focka[i].begin(), focka[i].end(), 0.);
-          fill(fockb[i].begin(), fockb[i].end(), 0.);
-    }
 
-    }
+      countline = 0 ;
+      while (getline(ifb, lineb))
+      {
+          countline++ ;
 
-   for (int i = 0;i < nirrep;i++)
+          T val;
+          int p, q;
+          istringstream(lineb) >> val >> p >> q ;
+
+          fockb[i][(q-1)*norb+(p-1)]  = val; 
+          fockb[i][(p-1)*norb+(q-1)]  = val; 
+
+      } 
+    }
+   }
+
+    for (int i = 0;i < nirrep;i++)
     {
         vector<int> irreps(2,i);
 
@@ -615,7 +770,7 @@ void uhf_modelh<T>::buildFock()
 }
 
 template <typename T>
-void uhf_modelh<T>::DIISExtrap()
+void pyscf_import<T>::DIISExtrap()
 {
     auto& S      = this->template get   <SymmetryBlockedTensor<T>>("S");
     auto& Smhalf = this->template gettmp<SymmetryBlockedTensor<T>>("S^-1/2");
@@ -679,8 +834,12 @@ void uhf_modelh<T>::DIISExtrap()
 
 static const char* spec = R"(
 
-    filename?
-        string v_no_sub.txt,
+    filename_focka?
+        string focka.txt,
+    filename_fockb?
+        string fockb.txt,
+    filename_overlap?
+        string overlap.txt,
     frozen_core?
         bool false,
     convergence?
@@ -705,5 +864,5 @@ static const char* spec = R"(
 
 )";
 
-INSTANTIATE_SPECIALIZATIONS(aquarius::aim::uhf_modelh);
-REGISTER_TASK(CONCAT(aquarius::aim::uhf_modelh<double>), "uhf_aim",spec);
+INSTANTIATE_SPECIALIZATIONS(aquarius::scf::pyscf_import);
+REGISTER_TASK(CONCAT(aquarius::scf::pyscf_import<double>), "pyscf_import",spec);

@@ -23,9 +23,8 @@ class Assemble_Files: public Task
     protected:
         typedef complex_type_t<U> CU;
 
-        string path_alpha_ip, path_beta_ip, path_gamma_ip, path_norm_ip ;
-        string path_alpha_ea, path_beta_ea, path_gamma_ea, path_norm_ea ; 
-        int nlanczos ;
+        string path_alpha_ip, path_beta_ip, path_gamma_ip, path_norm_ip, path_lanczos_ip ;
+        string path_alpha_ea, path_beta_ea, path_gamma_ea, path_norm_ea, path_lanczos_ea ; 
 
     public:
         Assemble_Files(const string& name, Config& config): Task(name, config)
@@ -38,13 +37,13 @@ class Assemble_Files: public Task
           path_beta_ip  = config.get<string>("file_beta_ip");  
           path_gamma_ip = config.get<string>("file_gamma_ip");  
           path_norm_ip  = config.get<string>("file_norm_ip");  
+          path_lanczos_ip  = config.get<string>("file_lanczos_ip");  
 
           path_alpha_ea = config.get<string>("file_alpha_ea");  
           path_beta_ea  = config.get<string>("file_beta_ea");  
           path_gamma_ea = config.get<string>("file_gamma_ea");  
           path_norm_ea  = config.get<string>("file_norm_ea");  
-
-          nlanczos = config.get<int>("nlanczos");
+          path_lanczos_ea  = config.get<string>("file_lanczos_ea");  
 
           this->addProduct(Product("ccsd.ipalpha", "alpha_ip", reqs));
           this->addProduct(Product("ccsd.ipbeta",  "beta_ip", reqs));
@@ -75,6 +74,33 @@ class Assemble_Files: public Task
             auto& gamma_ea = this-> put("gamma_ea", new vector<vector<U>>) ;
             auto& norm_ea = this-> put("norm_ea", new vector<U>) ;
 
+            vector<int> lanczos_ip ;
+            vector<int> lanczos_ea ;
+
+            if (arena.rank == 0)
+            {
+             ifstream if_lanczos_ip(path_lanczos_ip);
+             string line1;
+                                                                
+             while (getline(if_lanczos_ip, line1))
+             {
+                int val;
+                int p ;
+                istringstream(line1) >> p >> val;
+                lanczos_ip.emplace_back(val) ; 
+             }
+
+             ifstream if_lanczos_ea(path_lanczos_ea);
+             while (getline(if_lanczos_ea, line1))
+             {
+                int val;
+                int p ;
+                istringstream(line1) >> p >> val;
+                lanczos_ea.emplace_back(val) ; 
+             }
+            }
+
+
             alpha_ip.resize(norb*(norb+1)/2) ;
             beta_ip.resize(norb*(norb+1)/2) ;
             gamma_ip.resize(norb*(norb+1)/2) ;
@@ -86,97 +112,109 @@ class Assemble_Files: public Task
             norm_ea.resize(norb*(norb+1)/2) ;
 
             for (int n = 0;n < (norb*(norb+1)/2);n++){
-              alpha_ip[n].resize(nlanczos) ;
-              beta_ip[n].resize(nlanczos) ;
-              gamma_ip[n].resize(nlanczos) ;
+              alpha_ip[n].resize(lanczos_ip[n]) ;
+              beta_ip[n].resize(lanczos_ip[n]) ;
+              gamma_ip[n].resize(lanczos_ip[n]) ;
 
-              alpha_ea[n].resize(nlanczos) ;
-              beta_ea[n].resize(nlanczos) ;
-              gamma_ea[n].resize(nlanczos) ;
+              alpha_ea[n].resize(lanczos_ea[n]) ;
+              beta_ea[n].resize(lanczos_ea[n]) ;
+              gamma_ea[n].resize(lanczos_ea[n]) ;
             }
+
+            if (arena.rank == 0)
+            {
                                                                 
              ifstream if_alpha_ip(path_alpha_ip);
-             string line;
+             string line1;
                                                                 
-             while (getline(if_alpha_ip, line))
+             while (getline(if_alpha_ip, line1))
              {
                 U val;
                 int p, q ;
-                istringstream(line) >> p >> q >> val;
+                istringstream(line1) >> p >> q >> val;
                 alpha_ip[p][q] = val ; 
              }     
            
              ifstream if_beta_ip(path_beta_ip);
+             string line2;
 
-             while (getline(if_beta_ip, line))
+             while (getline(if_beta_ip, line2))
              {
                 U val;
                 int p, q ;
-                istringstream(line) >> p >> q >> val;
+                istringstream(line2) >> p >> q >> val;
                 beta_ip[p][q] = val ; 
              } 
 
              ifstream if_gamma_ip(path_gamma_ip);
+             string line3;
 
-             while (getline(if_gamma_ip, line))
+             while (getline(if_gamma_ip, line3))
              {
                 U val;
                 int p, q ;
-                istringstream(line) >> p >> q >> val;
+                istringstream(line3) >> p >> q >> val;
                 gamma_ip[p][q] = val ; 
              }
 
              ifstream if_norm_ip(path_norm_ip);
+             string line4;
 
              int countline = 0 ;
-             while (getline(if_norm_ip, line))
+             while (getline(if_norm_ip, line4))
              {
                 U val;
-                istringstream(line) >> val;
+                istringstream(line4) >> val;
                 norm_ip[countline] = val ; 
                 countline++ ;
               }
 
+
              ifstream if_alpha_ea(path_alpha_ea);
+             string line5;
                                                                 
-             while (getline(if_alpha_ea, line))
+             while (getline(if_alpha_ea, line5))
              {
                 U val;
                 int p, q ;
-                istringstream(line) >> p >> q >> val;
+                istringstream(line5) >> p >> q >> val;
                 alpha_ea[p][q] = val ; 
              }     
 
              ifstream if_beta_ea(path_beta_ea);
+             string line6;
 
-             while (getline(if_beta_ea, line))
+             while (getline(if_beta_ea, line6))
              {
                 U val;
                 int p, q ;
-                istringstream(line) >> p >> q >> val;
+                istringstream(line6) >> p >> q >> val;
                 beta_ea[p][q] = val ; 
              } 
 
              ifstream if_gamma_ea(path_gamma_ea);
+             string line7;
 
-             while (getline(if_gamma_ea, line))
+             while (getline(if_gamma_ea, line7))
              {
                 U val;
                 int p, q ;
-                istringstream(line) >> p >> q >> val;
+                istringstream(line7) >> p >> q >> val;
                 gamma_ea[p][q] = val ; 
              }
 
              ifstream if_norm_ea(path_norm_ea);
+             string line8;
 
              countline = 0 ;
-             while (getline(if_norm_ea, line))
+             while (getline(if_norm_ea, line8))
              {
                 U val;
-                istringstream(line) >> val;
+                istringstream(line8) >> val;
                 norm_ea[countline] = val ; 
                 countline++ ;
               }
+           }
 
         }
  };
@@ -190,12 +228,13 @@ static const char* spec = R"!(
     file_beta_ip  string,
     file_gamma_ip string,
     file_norm_ip  string,
+    file_lanczos_ip  string,
 
     file_alpha_ea string,
     file_beta_ea  string,
     file_gamma_ea string,
     file_norm_ea  string,
-    nlanczos int, 
+    file_lanczos_ea  string,
 )!";
 
 INSTANTIATE_SPECIALIZATIONS(aquarius::cc::Assemble_Files);

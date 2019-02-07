@@ -214,11 +214,11 @@ class CCSDSIGMA: public Task
             assert(cI[i].size() == N[i]*nI[i]);
             assert(ci[i].size() == N[i]*ni[i]);
          }        
-     c_full.clear() ;  
-    for (int i = 0;i < nirreps;i++){
-      (nspin == 0) ? c_full.insert(c_full.begin(),cI[i].begin(),cI[i].end()) : c_full.insert(c_full.begin(),ci[i].begin(),ci[i].end());
-      (nspin == 0) ? c_full.insert(c_full.end(),cA[i].begin(),cA[i].end()) : c_full.insert(c_full.end(),ca[i].begin(),ca[i].end());
-    }
+       c_full.clear() ;  
+       for (int i = 0;i < nirreps;i++){
+         (nspin == 0) ? c_full.insert(c_full.begin(),cI[i].begin(),cI[i].end()) : c_full.insert(c_full.begin(),ci[i].begin(),ci[i].end());
+         (nspin == 0) ? c_full.insert(c_full.end(),cA[i].begin(),cA[i].end()) : c_full.insert(c_full.end(),ca[i].begin(),ca[i].end());
+       }
 
       fock.resize(norb*norb) ;
 
@@ -239,15 +239,14 @@ class CCSDSIGMA: public Task
        }
       } 
 
-    for (int omega = 0; omega < omegas.size() ;omega++)
-    {
+    for (int omega = 0; omega < omegas.size() ;omega++) {
       vector<CU> gf_imp(nr_impurities*nr_impurities,{0.,0.}) ;
       vector<CU> gf_tmp(norb*norb,{0.,0.}) ;
       vector<CU> G_inv(nr_impurities*nr_impurities) ;
 
     /* calculate total Green's function
      */ 
-        recalculate_gf(arena, 0., omega, gf_tmp) ;
+      recalculate_gf(arena, 0., omega, gf_tmp) ;
 
     if (nr_impurities > 0){
     
@@ -270,8 +269,7 @@ class CCSDSIGMA: public Task
 /* spectral function to a file
  */
 
-    if (arena.rank == 0){
-     if (grid_type == "real"){
+    if (arena.rank == 0 && grid_type == "real"){
         for (int i = 0; i < nr_impurities ; i++){
           std::stringstream stream;
            stream << "spectral_fn_"<<nspin<<"_"<<i<< ".txt";
@@ -281,7 +279,6 @@ class CCSDSIGMA: public Task
            gspec << omegas[omega].real() << " " << -piinverse*gf_imp[i*nr_impurities+i].imag() << std::endl ;
           gspec.close();
         }
-     }
     }
    }
 
@@ -291,57 +288,62 @@ class CCSDSIGMA: public Task
        {
          calculate_sigma(0., omega, gf_tmp, sigma[omega]) ;
 
-        if (arena.rank == 0){
-         if (grid_type == "real"){
-	      std::ofstream specdensity;
-	      specdensity.open ("spectral_fn.txt", ofstream::out|std::ios::app);
-              U value = 0. ;
-              for (int j = 0; j < norb ; j++)
-              {
-                value += gf_tmp[j*nr_impurities+j].imag() ;
-              }            
-	      specdensity << setprecision(12) << omegas[omega].real() << -piinverse*value << std::endl ; 
-	      specdensity.close();
-         } 
-        }  
+//      if (arena.rank == 0){
+//       if (grid_type == "imaginary"){
+//        for (int i = nI-10 ; i < (nI+10) ; i++){
+//          std::stringstream stream;
+//          stream << "selfenergy_"<<i<< ".txt";
+//          std::string fileName = stream.str();
+//          std::ofstream gspec;
+//          gspec.open (fileName.c_str(), ofstream::out|std::ios::app);
+//          gspec << omegas[omega].imag() << " " <<  sigma[omega][i*norb+i].real() << " " << sigma[omega][i*norb+i].imag() << std::endl ;
+//         gspec.close();
+//        }
+//       } 
+//        }  
        }
     } 
-   }
-
-   if (arena.rank == 0){
-    if (nr_impurities == 0){
-      for (int i = 0; i < norb ; i++){
-         for (int j = 0; j < norb ; j++){
-	    std::ofstream sigomega;
-	    sigomega.open ("sigma_total.txt", ofstream::out|std::ios::app);
-	    sigomega << setprecision(12) << sigma[0][i*norb+j] << std::endl ; 
-	    sigomega.close();
-         }
-      }
-    }
    }
 
    /* bisection starts here
     */
 
-    if (nr_impurities == 0){
+    if (nr_impurities == 0 && grid_type == "imaginary"){
 
-      U thrs = 1.e-5 ;
-      U mu = 0. ;
+       U thrs = 1.e-7 ;
+       U mu_hf = 0. ;
 
-//     bisection_HF(mu) ; 
+       cout << " Just Before Bisection " << endl ;
+
+       bisection_HF(mu_hf) ; 
 
        energy = 0. ; 
  
        vector<vector<CU>> gf_final(nmax,vector<CU>(norb*norb)) ;
 
+       U mu = 0. ;
        bisection(arena, mu, sigma, gf_final, density) ;
 
        for (int omega = 0; omega < nmax ; omega++){
         sigma[omega].clear ();
-        calculate_sigma(0., omega, gf_final[omega], sigma[omega]) ;
+//        calculate_sigma(0., omega, gf_final[omega], sigma[omega]) ;
+        calculate_sigma(mu_hf, omega, gf_final[omega], sigma[omega]) ;
         energy += E2b(sigma[omega], gf_final[omega]) ; 
        }
+
+//    if (arena.rank == 0){
+//     if ( nr_impurities == 0 && grid_type == "imaginary" ){
+//      for (int i = (nI-10); i < (nI+10) ; i++){
+//       for (int omega = 0; omega < nmax/10 ; omega++){
+//          std::ofstream sigomega;
+//          sigomega.open ("sigma_total.txt", ofstream::out|std::ios::app);
+//          sigomega <<  omegas[omega].imag() << " " << i << " " << setprecision(12) << sigma[omega][i*norb+i].imag() << std::endl ; 
+//          sigomega.close();
+//       }
+//      } 
+//     }
+//    }
+
        this->log(arena) << "Tr(Sigma.G) energy: " << (2.0/beta)*energy  << endl ;
 
        energy *= (2.0/beta) ;
@@ -351,19 +353,19 @@ class CCSDSIGMA: public Task
        this->log(arena) << "high frequency tail: " << E2b_high_frequency(sigma[nmax-1])/beta << endl;
        this->log(arena) << "total 2b energy: " << energy << endl ;
 
-      vector<U> density_ao(norb*norb,0.) ;
-      moao_transform_gf(density, c_full, density_ao) ; 
+       vector<U> density_ao(norb*norb,0.) ;
+       moao_transform_gf(density, c_full, density_ao) ; 
 
       if (arena.rank == 0) {
       std::ofstream dens_ao;
-      dens_ao.open("coeff.txt", ofstream::out);
+      dens_ao.open("density.txt", ofstream::out);
 
       for (int p = 0; p < norb ;p++){
        for (int q = 0; q < norb ;q++){
           dens_ao << setprecision(10) << density_ao[p*norb + q] << std::endl ; 
        }
       }
-      dens_ao.close() ;
+          dens_ao.close() ;
       }
 
       U value = 0. ; 
@@ -455,8 +457,6 @@ class CCSDSIGMA: public Task
          auto& gamma_ip = this->template get<vector<vector<U>>>("gamma_ip");
          auto& norm_ip = this->template get<vector<U>>("norm_ip");
 
-         int nvec_lanczos = alpha_ip[0].size() ;
-
          CU alpha_temp ;
          CU beta_temp ;
          CU gamma_temp ;
@@ -468,7 +468,7 @@ class CCSDSIGMA: public Task
               value  = {0.,0.} ;
               value1 = {0.,0.} ;
 
-             for(int i=(nvec_lanczos-1);i >= 0;i--){  
+             for(int i=(alpha_ip[p].size()-1);i >= 0;i--){  
               alpha_temp = {alpha_ip[p][i],0.} ;
               beta_temp  = {beta_ip[p][i],0.} ;
               gamma_temp = {gamma_ip[p][i],0.} ;
@@ -488,8 +488,6 @@ class CCSDSIGMA: public Task
          auto& gamma_ea = this->template get<vector<vector<U>>>("gamma_ea");
          auto& norm_ea = this->template get<vector<U>>("norm_ea");
 
-         int nvec_lanczos = alpha_ea[0].size() ;
-
          CU alpha_temp ;
          CU beta_temp ;
          CU gamma_temp ;
@@ -502,7 +500,7 @@ class CCSDSIGMA: public Task
              value  = {0.,0.} ;
              value1 = {0.,0.} ;
 
-             for(int i=(nvec_lanczos-1);i >= 0;i--){  
+             for(int i=(alpha_ea[p].size()-1);i >= 0;i--){  
               alpha_temp = {alpha_ea[p][i],0.} ;
               beta_temp  = {beta_ea[p][i],0.} ;
               gamma_temp = {gamma_ea[p][i],0.} ;
@@ -530,15 +528,16 @@ class CCSDSIGMA: public Task
 
       getri(norb, gf_inv.data(), norb, ipiv.data()) ;
 
-      axpy (norb*norb, -1.0, gf_inv.data(), 1, sigma.data(), 1);
+      axpy (norb*norb, {-1.0,0.}, gf_inv.data(), 1, sigma.data(), 1);
     }
 
     void calculate_gf_zero_inv(U mu, int omega, vector<CU> &gf_inv)
     {
+      CU mucomplex = {mu, 0.} ;
       for (int p = 0; p < norb ;p++){
         for (int q = 0; q < norb ;q++){
          if (q == p){
-           gf_inv[p*norb+q] = (omegas[omega] + mu - fock[p*norb+q]) ;
+           gf_inv[p*norb+q] = (omegas[omega] + mucomplex - fock[p*norb+q]) ;
           }
           else
           { 
@@ -581,12 +580,14 @@ class CCSDSIGMA: public Task
    {
     int nelec = ni + nI;
     int nspin = 0. ;
-    U threshold = 1.e-7 ;
+    U threshold = 1.e-6 ;
     U mu_min=-3., mu_max=3.;
     U mu_lower, mu_upper ;
 
     mu_lower = mu_min ; 
     mu_upper = mu_max ; 
+
+    if (arena.rank == 0) cout << " Bisection Started >>>> " << endl ; 
 
     do
     {
@@ -598,9 +599,9 @@ class CCSDSIGMA: public Task
      for (int omega = 0; omega < nmax ; omega++)
      {  
         recalculate_gf( mu, omega, gf[omega], sigma[omega]) ;
-  //    recalculate_gf( arena, mu, omega, gf[omega]) ;
-    
-      calculate_density(omega,gf[omega],density) ;
+//      recalculate_gf( arena, mu, omega, gf[omega]) ;
+
+       calculate_density(omega,gf[omega],density) ;
      }
 
       add_density_high_frequency_tail (density) ;
@@ -624,7 +625,7 @@ class CCSDSIGMA: public Task
    {
     int nelec = ni + nI;
     int nspin = 0. ;
-    U threshold = 1.e-5 ;
+    U threshold = 1.e-6 ;
     U mu_min=-3., mu_max=3.;
     U mu_lower, mu_upper ;
 
@@ -652,7 +653,7 @@ class CCSDSIGMA: public Task
 
        getri(norb, gf_inv.data(), norb, ipiv.data()) ;
     
-      calculate_density(omega,gf_inv,density) ;
+       calculate_density(omega,gf_inv,density) ;
      }
 
       add_density_high_frequency_tail (density) ;
@@ -666,7 +667,7 @@ class CCSDSIGMA: public Task
        } 
     } while(abs(nelec-2.0*trace(density)) > threshold); 
     
-     cout << "bisection has converged" << endl ;
+     cout << "HF bisection has converged" << endl ;
      cout << "chemical potential: " << mu << endl ;
      cout << "total number of electrons: " << 2.0*trace(density) << endl ;
    } 
@@ -677,7 +678,7 @@ class CCSDSIGMA: public Task
       for (int p = 0; p < norb ;p++) 
        for (int q = 0; q < norb ;q++) 
         
-           twob_energy +=(sigma[p*norb+q].real()*gf_original[p*norb+q].real() - sigma[p*norb+q].imag()*gf_original[p*norb+q].imag()) ;
+          twob_energy +=(sigma[p*norb+q].real()*gf_original[p*norb+q].real() - sigma[p*norb+q].imag()*gf_original[p*norb+q].imag()) ;
 
       return twob_energy ;
    } 
@@ -801,8 +802,8 @@ class CCSDSIGMA: public Task
      return e2b_hf ;
    } 
 
-   void bare_gf(int omega, vector<CU> G_inv)
-   {
+   void bare_gf(int omega, vector<CU> G_inv){
+   
   /* calculate bare Green's function..
    */  
 

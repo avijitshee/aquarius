@@ -4,6 +4,7 @@
 #include "util/global.hpp"
 
 #include "scf/aouhf.hpp"
+#include "scf/pyscf_import.hpp"
 #include "integrals/2eints.hpp"
 
 #include "moints.hpp"

@@ -1,4 +1,5 @@
 #include "aouhf.hpp"
+#include <mkl_cblas.h>
 
 using namespace aquarius::tensor;
 using namespace aquarius::input;
@@ -73,8 +74,7 @@ void AOUHF<T,WhichUHF>::buildFock()
         assert(densa[i].size() == norb[i]*norb[i]);
 
          std::ifstream coeff("coeff.txt");
-         if (coeff)
-         {
+         if (coeff){
           densa[i].clear();
           densb[i].clear();
           coeff_exists = true ; 
@@ -86,10 +86,8 @@ void AOUHF<T,WhichUHF>::buildFock()
   
        if (coeff_exists){ densb[i] = densa[i] ; 
 
-        for (int j = 0;j < norb[i]*norb[i];j++)
-        {
-          energy_firstiter  += 0.5*(focka[i][j]*densa[i][j] + fockb[i][j]*densb[i][j]) ;
-        }} 
+          energy_firstiter  += 0.5*(cblas_ddot(norb[i]*norb[i], focka[i].data(), 1, densa[i].data(), 1) +cblas_ddot(norb[i]*norb[i], fockb[i].data(), 1, densb[i].data(), 1)) ;
+        } 
 
         densab[i] = densa[i];
         //PROFILE_FLOPS(norb[i]*norb[i]);
@@ -270,6 +268,9 @@ void AOUHF<T,WhichUHF>::buildFock()
             }
 
             Fb.writeRemoteData(irreps, pairs);
+
+            energy_firstiter  += 0.5*(cblas_ddot(norb[i]*norb[i], focka[i].data(), 1, densa[i].data(), 1) +cblas_ddot(norb[i]*norb[i], fockb[i].data(), 1, densb[i].data(), 1)) ;
+
         }
         else
         {
@@ -282,12 +283,8 @@ void AOUHF<T,WhichUHF>::buildFock()
         }
     }
 
-    for (int i = 0;i < nirrep;i++)
-    {
-      for (int j = 0;j < norb[i]*norb[i];j++)
-      {
-        energy_firstiter  += 0.5*(focka[i][j]*densa[i][j] + fockb[i][j]*densb[i][j]) ;
-      } 
+    for (int i = 0;i < nirrep;i++){
+       
     }
 
     Logger::log(arena) << "energy from 1st iteration: " << setprecision(10) << energy_firstiter+molecule.getNuclearRepulsion() << endl ;

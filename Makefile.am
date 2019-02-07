@@ -118,6 +118,7 @@ __top_builddir__bin_aquarius_SOURCES = \
 	\
 	src/scf/aouhf.cxx \
 	src/scf/cfourscf.cxx \
+        src/scf/pyscf_import.cxx
 	src/scf/uhf_local.cxx \
 	src/scf/uhf.cxx \
 	\
