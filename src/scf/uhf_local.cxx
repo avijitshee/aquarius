@@ -29,10 +29,20 @@ void LocalUHF<T>::calcSMinusHalf()
 
     for (int i = 0;i < molecule.getGroup().getNumIrreps();i++)
     {
-        //cout << "S " << (i+1) << endl;
-        //vector<T> vals;
-        //S({i,i}).getAllData(vals);
-        //printmatrix(norb[i], norb[i], vals.data(), 6, 3, 108);
+        cout << "S " << (i+1) << endl;
+        vector<T> vals;
+        S({i,i}).getAllData(vals);
+        for (int k = 0;k < norb[i];k++)
+        {
+        for (int l = 0;l < (k+1);l++)
+        {
+         if (abs(vals[k*norb[i]+l]) > 1.e-5) cout << k+1 << " " << l+1 << " " << setprecision(8) << vals[k*norb[i]+l] << endl ;
+
+         } 
+        } 
+
+
+//        printmatrix(norb[i], norb[i], vals.data(), 6, 3, 108);
     }
 
     for (int i = 0;i < molecule.getGroup().getNumIrreps();i++)

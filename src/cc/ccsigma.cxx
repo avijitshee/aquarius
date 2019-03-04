@@ -265,42 +265,56 @@ class CCSDSIGMA: public Task
          }
       }
     }
+   }
 
 /* spectral function to a file
  */
 
+  if (nr_impurities == 0)
+  {
     if (arena.rank == 0 && grid_type == "real"){
-        for (int i = 0; i < nr_impurities ; i++){
+        for (int i = 0; i < norb ; i++){
           std::stringstream stream;
            stream << "spectral_fn_"<<nspin<<"_"<<i<< ".txt";
            std::string fileName = stream.str();
            std::ofstream gspec;
            gspec.open (fileName.c_str(), ofstream::out|std::ios::app);
-           gspec << omegas[omega].real() << " " << -piinverse*gf_imp[i*nr_impurities+i].imag() << std::endl ;
+           gspec << omegas[omega].real() << " " << -piinverse*gf_tmp[i*norb+i].imag() << std::endl ;
           gspec.close();
         }
     }
-   }
-
+   
 /* calculate self-energy
  */ 
-       if (nr_impurities == 0)
-       {
          calculate_sigma(0., omega, gf_tmp, sigma[omega]) ;
 
-//      if (arena.rank == 0){
-//       if (grid_type == "imaginary"){
-//        for (int i = nI-10 ; i < (nI+10) ; i++){
-//          std::stringstream stream;
-//          stream << "selfenergy_"<<i<< ".txt";
-//          std::string fileName = stream.str();
-//          std::ofstream gspec;
-//          gspec.open (fileName.c_str(), ofstream::out|std::ios::app);
-//          gspec << omegas[omega].imag() << " " <<  sigma[omega][i*norb+i].real() << " " << sigma[omega][i*norb+i].imag() << std::endl ;
-//         gspec.close();
-//        }
-//       } 
-//        }  
+         U traces_real = 0. ;
+         U traces_imag = 0. ;
+         U traceg_real = 0. ;
+         U traceg_imag = 0. ;
+
+        if (arena.rank == 0){
+         if (grid_type == "imaginary"){
+            std::ofstream gspec;
+            gspec.open ("selfenergy_traced.txt", ofstream::out|std::ios::app);
+            std::ofstream tracegspec;
+            tracegspec.open ("gmats_traced.txt", ofstream::out|std::ios::app);
+
+            for (int i = 4 ; i < norb ; i++){
+               traces_real += sigma[omega][i*norb+i].real() ;
+               traces_imag += sigma[omega][i*norb+i].imag() ;
+               traceg_real += gf_tmp[i*norb+i].real() ;
+               traceg_imag += gf_tmp[i*norb+i].imag() ;
+            }
+
+            if (omega < 5000) {
+              gspec << omega << " " <<  traces_real/(norb-4) << " " << traces_imag/(norb-4) << std::endl ;
+              tracegspec << omega << " " <<  traceg_real/(norb-4) << " " << traceg_imag/(norb-4) << std::endl ;
+            } 
+              gspec.close();
+              tracegspec.close();
+         } 
+        } //end of print loop 
        }
     } 
    }
@@ -326,7 +340,7 @@ class CCSDSIGMA: public Task
 
        for (int omega = 0; omega < nmax ; omega++){
         sigma[omega].clear ();
-//        calculate_sigma(0., omega, gf_final[omega], sigma[omega]) ;
+//      calculate_sigma(0., omega, gf_final[omega], sigma[omega]) ;
         calculate_sigma(mu_hf, omega, gf_final[omega], sigma[omega]) ;
         energy += E2b(sigma[omega], gf_final[omega]) ; 
        }
@@ -580,7 +594,7 @@ class CCSDSIGMA: public Task
    {
     int nelec = ni + nI;
     int nspin = 0. ;
-    U threshold = 1.e-6 ;
+    U threshold = 1.e-4 ;
     U mu_min=-3., mu_max=3.;
     U mu_lower, mu_upper ;
 
