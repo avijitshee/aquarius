@@ -283,10 +283,6 @@ void AOUHF<T,WhichUHF>::buildFock()
         }
     }
 
-    for (int i = 0;i < nirrep;i++){
-       
-    }
-
     Logger::log(arena) << "energy from 1st iteration: " << setprecision(10) << energy_firstiter+molecule.getNuclearRepulsion() << endl ;
 
 }
