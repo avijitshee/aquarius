@@ -20,7 +20,8 @@ template <typename U>
 class ReadInts : public task::Task  
 {
     protected:
-        vector<U> integral_diagonal ;
+        vector<U> int_a ;
+        vector<U> int_b ;
         vector<U> mo_coeff ;
         bool coeff_exists = false ;
 
@@ -40,13 +41,27 @@ class ReadInts : public task::Task
          }
         }
 
-        void read_1e_integrals()
+        void read_1e_integrals(const int norb)
         {
-          std::ifstream one_diag("fock_imp.txt");
-          std::istream_iterator<U> start(one_diag), end;
-          std::vector<U> diagonal(start, end);
-          std::cout << "Read " << diagonal.size() << " numbers" << std::endl;
-          std::copy(diagonal.begin(), diagonal.end(),std::back_inserter(integral_diagonal)); 
+
+           int_a.resize(norb*norb) ;
+           int_b.resize(norb*norb) ;
+
+           string path_fock = "fock_imp_0.txt";
+
+           ifstream ifs(path_fock);
+           string line;
+
+           while (getline(ifs, line))
+           {    
+              U vala,valb;
+              int p, q;
+              istringstream(line) >> p >> q >> vala >> valb  ;
+
+              int_a[p*norb+q]  = vala; 
+              int_b[p*norb+q]  = valb; 
+
+           }
         }
 
         bool run(task::TaskDAG& dag, const Arena& arena);                                                                            

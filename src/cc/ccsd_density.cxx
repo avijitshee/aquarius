@@ -157,7 +157,6 @@ class CCSDDensity : public Task
 
 //symmetrize density matrix
 
-
             vector<U> l(norb*norb);
             vector<CU> s_tmp(norb);
             vector<U> vr_tmp(norb*norb);
@@ -178,8 +177,6 @@ class CCSDDensity : public Task
 
             printf("total occupancy: %.15f\n", value);
           
-
-
             U EIA = scalar(DIA*H.getIA());
             U EAI = scalar(DAI*H.getAI());
             U EAB = scalar(DAB*H.getAB());

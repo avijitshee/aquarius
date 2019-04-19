@@ -141,12 +141,9 @@ class CCSDIPGF : public Iterative<complex_type_t<U>>
              }
            }
 
-        for (int nspin = 0; nspin < maxspin ; nspin++)   
-         {
-          for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   
-          {
-           for (int orbright = orbstart; orbright < orbend ; orbright++)   
-            {
+        for (int nspin = 0; nspin < maxspin ; nspin++)   {
+          for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   {
+           for (int orbright = orbstart; orbright < orbend ; orbright++) {  
 
              printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
 

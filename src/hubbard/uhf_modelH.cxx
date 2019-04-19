@@ -475,7 +475,7 @@ void uhf_modelh<T>::calcDensity()
     auto& Da  = this->template get   <SymmetryBlockedTensor<T>>("Da");
     auto& Db  = this->template get   <SymmetryBlockedTensor<T>>("Db");
 
-    vector<int> zero(norb, 0);
+    vector<int> zero(1, 0);
     SymmetryBlockedTensor<T> Ca_occ("CI", this->template gettmp<SymmetryBlockedTensor<T>>("Ca"),
                                     {zero,zero}, {{norb},occ_alpha});
     SymmetryBlockedTensor<T> Cb_occ("Ci", this->template gettmp<SymmetryBlockedTensor<T>>("Cb"),

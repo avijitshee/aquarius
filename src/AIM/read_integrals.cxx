@@ -19,7 +19,8 @@ ReadInts<U>::ReadInts(const string& name, input::Config& config)
     reqs.emplace_back("aim","aim"); 
     addProduct("Da", "Da", reqs);
     addProduct("Db", "Db", reqs);
-    addProduct("aim_1eints", "H", reqs);
+    addProduct("aim_alphaints", "Ha", reqs);
+    addProduct("aim_betaints", "Hb", reqs);
     addProduct("aim_S", "S", reqs);
 }
 
@@ -35,20 +36,25 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     int nbeta = aim.getNumBetaElectrons() ;
     int ndoc = aim.getDoccOrbitals() ;
 
-    vector<vector<double>> E(norb,vector<double>(norb));
+    vector<vector<double>> Ea(norb,vector<double>(norb));
+    vector<vector<double>> Eb(norb,vector<double>(norb));
     vector<vector<double>> Dalpha(norb,vector<double>(norb));
     vector<vector<double>> Dbeta(norb,vector<double>(norb));
 
-    read_1e_integrals() ; 
-    read_coeff() ;	
-
-
-   if (coeff_exists) 
-   {
-    for (int i = 0;i < norb;i++)
+    if (arena.rank == 0)
     {
-     for (int j = 0;j < norb;j++)
-     {
+     read_1e_integrals(norb) ; 
+    } else
+
+    {
+           int_a.resize(norb*norb) ;
+           int_b.resize(norb*norb) ;
+     } 
+
+    read_coeff() ;	
+   if (coeff_exists) {
+    for (int i = 0;i < norb;i++){
+     for (int j = 0;j < norb;j++){
        Dalpha[i][j] = mo_coeff[i*norb+j] ;
 //     for (int k = 0;k < nalpha;k++)
 //     {
@@ -70,22 +76,25 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     }
    }
 
-    for (int i = 0;i < norb;i++)
-    {
-     for (int j = 0;j < norb;j++)
-     {
-       E[i][j] = integral_diagonal[i*norb+j] ;
+    for (int i = 0;i < norb;i++){
+     for (int j = 0;j < norb;j++){
+     
+       Ea[i][j] = int_a[i*norb+j] ;
+       Eb[i][j] = int_b[i*norb+j] ;
+
      }
     }
 
-    auto& H =  this->put("H", new SymmetryBlockedTensor<U>("Fa", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
+    auto& Ha =  this->put("Ha", new SymmetryBlockedTensor<U>("Fa", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
+    auto& Hb =  this->put("Hb", new SymmetryBlockedTensor<U>("Fb", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
     auto& Da = this->put("Da", new SymmetryBlockedTensor<U>("Da", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
     auto& Db = this->put("Db", new SymmetryBlockedTensor<U>("Db", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
     auto& S  = this->put("S", new SymmetryBlockedTensor<U>("S", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
 
     vector<tkv_pair<U>> dapairs;
     vector<tkv_pair<U>> dbpairs;
-    vector<tkv_pair<U>> fpairs;
+    vector<tkv_pair<U>> fapairs;
+    vector<tkv_pair<U>> fbpairs;
     vector<tkv_pair<U>> ov_pairs;
 
     for (int i = 0;i < norb;i++)
@@ -137,11 +146,10 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     }
    }
 
-    for (int i = 0;i < norb;i++)
-    {
-       for (int j = 0;j < norb;j++)
-       {
-        fpairs.emplace_back(i*norb+j, E[i][j]);
+    for (int i = 0;i < norb;i++){
+       for (int j = 0;j < norb;j++){
+        fapairs.emplace_back(i*norb+j, Ea[i][j]);
+        fbpairs.emplace_back(i*norb+j, Eb[i][j]);
        }
     }
 
@@ -149,14 +157,16 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     {
         Da.writeRemoteData({0,0}, dapairs);
         Db.writeRemoteData({0,0}, dbpairs);
-        H.writeRemoteData({0,0}, fpairs);
+        Ha.writeRemoteData({0,0}, fapairs);
+        Hb.writeRemoteData({0,0}, fbpairs);
         S.writeRemoteData({0,0}, ov_pairs);
     }
     else
     {
         Da.writeRemoteData({0,0});
         Db.writeRemoteData({0,0});
-        H.writeRemoteData({0,0});
+        Ha.writeRemoteData({0,0});
+        Hb.writeRemoteData({0,0});
         S.writeRemoteData({0,0}, ov_pairs);
     }
     return true;

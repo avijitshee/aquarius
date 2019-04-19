@@ -28,6 +28,7 @@ __top_builddir__bin_aquarius_SOURCES = \
 	src/cc/ccsdipgf.cxx \
 	src/cc/ccsdeagf.cxx \
 	src/cc/ccsigma.cxx \
+	src/cc/assemble_files.cxx \
 	src/cc/ccsdipgf_lanczos.cxx \
 	src/cc/ccsdeagf_lanczos.cxx \
 	src/cc/ccsdtipgf.cxx \
@@ -117,6 +118,7 @@ __top_builddir__bin_aquarius_SOURCES = \
 	\
 	src/scf/aouhf.cxx \
 	src/scf/cfourscf.cxx \
+        src/scf/pyscf_import.cxx
 	src/scf/uhf_local.cxx \
 	src/scf/uhf.cxx \
 	\

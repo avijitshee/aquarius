@@ -256,13 +256,6 @@ class Lanczos : public task::Destructible
               c_r = r[0]/beta[nextrap-1] ; 
              } 
  
-//          printf("test orthogonality: %.10f \n",scalar(c_r*old_c_l_particle[0]));
-//          printf("test orthogonality: %.10f \n",scalar(old_c_r_particle[0]*c_l));
-//          printf("test normalization: %.10f \n",scalar(c_r*c_l));
-
-//          printf("print alpha: %.10f \n",alpha[nextrap-1]);
-//          printf("print beta: %.10f \n",beta[nextrap-1]);
-//          printf("print gamma: %.10f \n",gamma[nextrap-1]);
         }
 
         void reset(int nvec = 1)

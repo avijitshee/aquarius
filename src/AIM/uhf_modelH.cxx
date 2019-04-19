@@ -17,13 +17,14 @@ namespace aim
 template <typename T>
 uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
 : Iterative<T>(name, config), frozen_core(config.get<bool>("frozen_core")),
-  path(config.get<string>("filename")), diis(config.get("diis"), 2)
+   path_fock(config.get<string>("filename_fock")), path(config.get<string>("filename_v")), diis(config.get("diis"), 2)
 {
     damp_density = config.get<double>("damping_density");
     vector<Requirement> reqs;
     reqs += Requirement("aim", "aim");
     reqs += Requirement("aim_S", "S");
-    reqs += Requirement("aim_1eints", "H");
+    reqs += Requirement("aim_alphaints", "Ha");
+    reqs += Requirement("aim_betaints", "Hb");
     reqs += Requirement("Da", "Da");
     reqs += Requirement("Db", "Db");
     this->addProduct(Product("double", "energy", reqs));
@@ -137,7 +138,7 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
         occ_beta[i] -= nfrozen_beta[i];
     }
 
-    vector<int> zero(norb, 0);
+    vector<int> zero(1, 0);
     this->put("occ", new MOSpace<T>(SymmetryBlockedTensor<T>("CI", this->template gettmp<SymmetryBlockedTensor<T>>("Ca"),
                                                              {zero,nfrozen_alpha},
                                                              {{norb},occ_alpha}),
@@ -214,10 +215,10 @@ void uhf_modelh<T>::iterate(const Arena& arena)
     sort(E_alpha_sorted.begin(), E_alpha_sorted.end());
     sort(E_beta_sorted.begin(), E_beta_sorted.end());
 
-    for (int i = 0;i < nalpha;i++)
-    {
+    for (int i = 0;i < nalpha;i++){
         occ_alpha[E_alpha_sorted[i].second]++;
     }
+
     for (int i = 0;i < nbeta;i++)
     {
         occ_beta[E_beta_sorted[i].second]++;
@@ -365,6 +366,17 @@ void uhf_modelh<T>::diagonalizeFock()
                 assert(info == 0);
 
                 S.arena.comm().Bcast(E);
+
+                vector<pair<real_type_t<T>,int>> E_sort;
+                for (int j = 0;j < norb;j++)
+                {
+                  E_sort.push_back(make_pair(E[j],j));
+                }
+
+                sort(E_sort.begin(), E_sort.end());
+
+
+/*
                 
                 for (int j = 0;j < norb;j++)
                 {
@@ -386,6 +398,17 @@ void uhf_modelh<T>::diagonalizeFock()
                     pairs[j].k = j;
                     pairs[j].d = fock[j];
                 }
+*/
+
+
+                for (int i = 0;i < norb;i++){
+                 for (int j = 0;j < norb;j++){
+                  
+                    pairs[i*norb+j].k = i*norb+j;
+                    pairs[i*norb+j].d = fock[j+E_sort[i].second*norb];
+                  }
+                }
+
                 C.writeRemoteData(irreps, pairs);
             }
         }
@@ -440,7 +463,8 @@ template <typename T>
 void uhf_modelh<T>::calcEnergy()
 {
 
-    auto& H  = this->template get<SymmetryBlockedTensor<T>>("H");
+    auto& Ha  = this->template get<SymmetryBlockedTensor<T>>("Ha");
+    auto& Hb  = this->template get<SymmetryBlockedTensor<T>>("Hb");
     auto& Fa = this->template get<SymmetryBlockedTensor<T>>("Fa");
     auto& Fb = this->template get<SymmetryBlockedTensor<T>>("Fb");
     auto& Da = this->template get<SymmetryBlockedTensor<T>>("Da");
@@ -451,14 +475,13 @@ void uhf_modelh<T>::calcEnergy()
      *
      *   = (1/2)Tr[Da*(Fa+H) + Db*(Fb+H)]
      */
-    Fa["ab"] += H["ab"];
-    Fb["ab"] += H["ab"];
+    Fa["ab"] += Ha["ab"];
+    Fb["ab"] += Hb["ab"];
 
-//    this->energy()  = aim.getNuclearRepulsion();
     this->energy()  = 0.5*scalar(Da["ab"]*Fa["ab"]);
     this->energy() += 0.5*scalar(Db["ab"]*Fb["ab"]);
-    Fa["ab"] -= H["ab"];
-    Fb["ab"] -= H["ab"];
+    Fa["ab"] -= Ha["ab"];
+    Fb["ab"] -= Hb["ab"];
 }
 
 template <typename T>
@@ -475,7 +498,7 @@ void uhf_modelh<T>::calcDensity()
     auto& Da  = this->template get   <SymmetryBlockedTensor<T>>("Da");
     auto& Db  = this->template get   <SymmetryBlockedTensor<T>>("Db");
 
-    vector<int> zero(norb, 0);
+    vector<int> zero(1, 0);
     SymmetryBlockedTensor<T> Ca_occ("CI", this->template gettmp<SymmetryBlockedTensor<T>>("Ca"),
                                     {zero,zero}, {{norb},occ_alpha});
     SymmetryBlockedTensor<T> Cb_occ("Ci", this->template gettmp<SymmetryBlockedTensor<T>>("Cb"),
@@ -502,35 +525,59 @@ void uhf_modelh<T>::buildFock()
 
     for (int i = 1;i < nirrep;i++) ;
 
-    auto& H  = this->template get<SymmetryBlockedTensor<T>>("H");
+    auto& Ha  = this->template get<SymmetryBlockedTensor<T>>("Ha");
+    auto& Hb  = this->template get<SymmetryBlockedTensor<T>>("Hb");
     auto& Da = this->template get<SymmetryBlockedTensor<T>>("Da");
     auto& Db = this->template get<SymmetryBlockedTensor<T>>("Db");
     auto& Fa = this->template get<SymmetryBlockedTensor<T>>("Fa");
     auto& Fb = this->template get<SymmetryBlockedTensor<T>>("Fb");
 
-    Arena& arena = H.arena;
+    Arena& arena = Ha.arena;
 
     vector<vector<T>> focka(nirrep), fockb(nirrep);
     vector<vector<T>> densa(nirrep), densb(nirrep);
     vector<vector<T>> densab(nirrep);
     T diff ;
+    T energy_firstiter ;
 
     for (int i = 0;i < nirrep;i++)
     {
         vector<int> irreps(2,i);
+        focka[i].resize(norb*norb, (T)0);
+        fockb[i].resize(norb*norb, (T)0);
 
-        if (arena.rank == 0)
-        {
-            H.getAllData(irreps, focka[i], 0);
-            assert(focka[i].size() == norb*norb);
-            fockb[i] = focka[i];
-        }
-        else
-        {
-            H.getAllData(irreps, 0);
-            focka[i].resize(norb*norb, (T)0);
-            fockb[i].resize(norb*norb, (T)0);
-        }
+    if (arena.rank == 0)
+    {
+      ifstream ifs(path_fock);
+      string line;
+
+      while (getline(ifs, line))
+      {
+
+          T vala,valb;
+          int p, q;
+          istringstream(line) >> p >> q >> vala >> valb  ;
+
+          focka[i][p*norb+q]  = vala; 
+          fockb[i][p*norb+q]  = valb; 
+
+      }
+    }
+
+//      if (arena.rank == 0)
+//      {
+//          Ha.getAllData(irreps, focka[i], 0);
+//          Hb.getAllData(irreps, fockb[i], 0);
+//          assert(focka[i].size() == norb*norb);
+//      }
+//      else
+//      {
+//          Ha.getAllData(irreps, 0);
+//          Hb.getAllData(irreps, 0);
+//          focka[i].resize(norb*norb, (T)0);
+//          fockb[i].resize(norb*norb, (T)0);
+//      }
+
 
         Da.getAllData(irreps, densa[i]);
         assert(densa[i].size() == norb*norb);
@@ -548,7 +595,7 @@ void uhf_modelh<T>::buildFock()
       ifstream ifs(path);
       string line;
 
-      if (this->iter() > 0) {
+//      if (this->iter() > 0) {
         densab[i] = densa[i];
         axpy(norb*norb, 1.0, densb[i].data(), 1, densab[i].data(), 1);
 
@@ -567,13 +614,14 @@ void uhf_modelh<T>::buildFock()
           fockb[i][p*norb+q] += densab[i][k*norb+l]*val; 
           fockb[i][p*norb+l] -= densb[i][k*norb+q]*val; 
       }
-      }
+//     }
     } else {
           fill(focka[i].begin(), focka[i].end(), 0.);
           fill(fockb[i].begin(), fockb[i].end(), 0.);
     }
 
     }
+
 
    for (int i = 0;i < nirrep;i++)
     {
@@ -679,8 +727,9 @@ void uhf_modelh<T>::DIISExtrap()
 }
 
 static const char* spec = R"(
-
-    filename?
+    filename_fock?
+        string fock.txt,
+    filename_v?
         string v_no_sub.txt,
     frozen_core?
         bool false,
@@ -689,7 +738,7 @@ static const char* spec = R"(
     max_iterations?
         int 150,
     damping_density?
-        double 0., 
+        double 1., 
     conv_type?
         enum { MAXE, RMSE, MAE },
     diis?
