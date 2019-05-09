@@ -84,9 +84,10 @@ class Lanczos : public task::Destructible
         }
 
     public:
-        Lanczos(const input::Config& config)
+        Lanczos(const input::Config& config, const int nvec)
         {
             parse(config);
+            reset(nvec);
         }
 
         void extrapolate_tridiagonal(op::ExcitationOperator  <T,1,2>& c_r,op::DeexcitationOperator<V,1,2>& c_l,op::ExcitationOperator  <T,1,2>& hc_r, op::DeexcitationOperator<V,1,2>& hc_l, const op::Denominator<T>& D, unique_vector<T>& alpha, unique_vector<T>& beta, unique_vector<T>& gamma)
@@ -168,7 +169,13 @@ class Lanczos : public task::Destructible
 
              temp = scalar(r[0]*s[0]) ; 
 
-             beta.emplace_back (sqrt(aquarius::abs(scalar(r[0]*s[0])))) ;
+             if (abs(temp) > 1.0e-10)
+             {
+               beta.emplace_back (sqrt(aquarius::abs(scalar(r[0]*s[0])))) ;
+             }else
+             {
+               beta.emplace_back (0.0) ;
+             }
 
              if (beta[nextrap] > 1.0e-10)
              {
@@ -238,7 +245,14 @@ class Lanczos : public task::Destructible
 
              temp = scalar(r[0]*s[0]) ; 
 
-             beta.emplace_back (sqrt(aquarius::abs(scalar(r[0]*s[0])))) ;
+             if (abs(temp) > 1.0e-10)
+             {
+               beta.emplace_back (sqrt(aquarius::abs(scalar(r[0]*s[0])))) ;
+             }else
+             {
+               beta.emplace_back (0.0) ;
+             }
+
              if (beta[nextrap] > 1.0e-10)
              {
               gamma.emplace_back (temp/beta[nextrap])  ; 
@@ -255,6 +269,18 @@ class Lanczos : public task::Destructible
               c_r = r[0]/beta[nextrap-1] ; 
              } 
  
+//          printf("test orthogonality: %.10f \n",scalar(c_r*old_c_l_particle[0]));
+//          printf("test orthogonality: %.10f \n",scalar(old_c_r_particle[0]*c_l));
+//          printf("test normalization: %.10f \n",scalar(c_r*c_l));
+
+//          printf("print alpha: %.10f \n",alpha[nextrap-1]);
+//          printf("print beta: %.10f \n",beta[nextrap-1]);
+//          printf("print gamma: %.10f \n",gamma[nextrap-1]);
+        }
+
+        void reset(int nvec = 1)
+        {
+            init(nvec);
         }
 };
 

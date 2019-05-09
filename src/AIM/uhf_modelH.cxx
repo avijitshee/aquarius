@@ -595,7 +595,7 @@ void uhf_modelh<T>::buildFock()
       ifstream ifs(path);
       string line;
 
-//      if (this->iter() > 0) {
+      if (this->iter() > 0) {
         densab[i] = densa[i];
         axpy(norb*norb, 1.0, densb[i].data(), 1, densab[i].data(), 1);
 
@@ -614,7 +614,7 @@ void uhf_modelh<T>::buildFock()
           fockb[i][p*norb+q] += densab[i][k*norb+l]*val; 
           fockb[i][p*norb+l] -= densb[i][k*norb+q]*val; 
       }
-//     }
+     }
     } else {
           fill(focka[i].begin(), focka[i].end(), 0.);
           fill(fockb[i].begin(), fockb[i].end(), 0.);

@@ -312,7 +312,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
               auto& D = this->puttmp("D", new Denominator<U>(H));
           
               int number_of_vectors = nA*nA*nI + nA ; 
-              this->puttmp("lanczos", new Lanczos<U,X>(lanczos_config,number_of_vectors));
+              this->puttmp("lanczos", new Lanczos<U,X>(lanczos_config, number_of_vectors));
 
               RL = b ;
               LL = e ;

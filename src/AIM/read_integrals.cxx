@@ -102,8 +102,6 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
         ov_pairs.emplace_back(i*norb+i, 1);
     }
 
-    aim.alphastring_to_vector(alpha_array) ;
-    aim.betastring_to_vector(beta_array) ;
 
    if (coeff_exists) 
    {
@@ -115,35 +113,22 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
        }
     }
 
-   for (int i = 0;i < norb;i++)
-    {
+   for (int i = 0;i < norb;i++){
        for (int j = 0;j < norb;j++)
        {
         dbpairs.emplace_back(i*norb+j, Dbeta[i][j]);
        }
     }
    }
-   else
-   {
-    for (int i = 0;i < ndoc;i++)
-    {
-        dapairs.emplace_back(i*norb+i, 1);
+   else{
+    for (int i = 0;i < nalpha;i++){
+        dapairs.emplace_back(i*norb+i,1) ;
     }
 
-    for (int i = 0;i < alpha_array.size();i++)
-    {
-        dapairs.emplace_back((i+ndoc)*norb+(i+ndoc), alpha_array[i]);
+    for (int i = 0;i < nbeta;i++){
+        dbpairs.emplace_back(i*norb+i,1) ;
     }
 
-    for (int i = 0;i < ndoc;i++)
-    {
-        dbpairs.emplace_back(i*norb+i, 1);
-    }
-
-    for (int i = 0;i < beta_array.size();i++)
-    {
-        dbpairs.emplace_back((i+ndoc)*norb+(i+ndoc), beta_array[i]);
-    }
    }
 
     for (int i = 0;i < norb;i++){

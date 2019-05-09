@@ -33,6 +33,7 @@ class CCSDT : public Iterative<U>
         {
             vector<Requirement> reqs;
             reqs.emplace_back("moints", "H");
+            reqs.push_back(Requirement("double", "HF_energy"));
             if (guess == "ccsd") reqs.emplace_back("ccsd.T", "Tccsd");
             this->addProduct("double", "mp2", reqs);
             this->addProduct("double", "energy", reqs);
@@ -46,6 +47,7 @@ class CCSDT : public Iterative<U>
         bool run(TaskDAG& dag, const Arena& arena)
         {
             const auto& H = this->template get<TwoElectronOperator<U>>("H");
+            const auto& E_HF = this ->template get<U>("HF_energy");   
 
             const Space& occ = H.occ;
             const Space& vrt = H.vrt;
@@ -95,6 +97,10 @@ class CCSDT : public Iterative<U>
 
             this->put("energy", new U(this->energy()));
             this->put("convergence", new U(this->conv()));
+
+            U E_CCSDT = E_HF+U(this->energy()) ;
+
+            Logger::log(arena) << "CCSDT energy = " << setprecision(10) << E_CCSDT << endl;
 
             /*
             if (isUsed("S2") || isUsed("multiplicity"))

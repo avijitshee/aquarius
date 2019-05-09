@@ -265,13 +265,13 @@ class CCSDSIGMA: public Task
           energy += E2b(sigma[nspin][omega], gf_final[omega]) ; 
          }
        }
-       this->log(arena) << "Tr(Sigma.G) energy: " << (2.0/beta)*energy  << endl ;
+       this->log(arena) << "Tr(Sigma.G) energy: " << (1.0/beta)*energy  << endl ;
 
        energy *= (1.0/beta) ;
 
-       energy += (1.0/beta)*E2b_high_frequency(nspin,sigma[0][nmax-1]) ;
+       energy += (1.0/beta)*E2b_high_frequency(nspin,sigma[nspin][nmax-1]) ;
 
-       this->log(arena) << "high frequency tail: " << E2b_high_frequency(nspin,sigma[0][nmax-1])/beta << endl;
+       this->log(arena) << "high frequency tail: " << E2b_high_frequency(nspin,sigma[nspin][nmax-1])/beta << endl;
        this->log(arena) << "total 2b energy: " << energy << endl ;
 
       vector<U> density_ao(norb*norb,0.) ;
@@ -341,7 +341,7 @@ class CCSDSIGMA: public Task
      return value ;
     }
 
-    void recalculate_gf(U mu, int omega, vector<U> &fock, vector<CU> &gf,  const vector<CU> &sigma){
+    void recalculate_gf(U mu, CU omega, vector<U> &fock, vector<CU> &gf,  const vector<CU> &sigma){
     
       vector<int> ipiv(norb) ;
 
@@ -451,8 +451,8 @@ class CCSDSIGMA: public Task
       axpy (norb*norb, -1.0, gf_inv.data(), 1, sigma.data(), 1);
     }
 
-    void calculate_gf_zero_inv(vector<U> &fock, U mu, CU omega, vector<CU> &gf_inv)
-    {
+    void calculate_gf_zero_inv(vector<U> &fock, U mu, CU omega, vector<CU> &gf_inv){
+    
       for (int p = 0; p < norb ;p++){
         for (int q = 0; q < norb ;q++){
          if (q == p){
@@ -516,9 +516,9 @@ class CCSDSIGMA: public Task
 
      for (int omega = 0; omega < omegas[nspin].size() ; omega++)
      {  
-//       recalculate_gf( mu, omega, fock, gf[omega], sigma[omega]) ;
+       recalculate_gf( mu, omegas[nspin][omega], fock, gf[omega], sigma[omega]) ;
 
-       recalculate_gf( arena,nspin, mu, omega, gf[omega]) ;
+//       recalculate_gf( arena,nspin, mu, omega, gf[omega]) ;
     
        calculate_density(omegas[nspin][omega],fock,gf[omega],density) ;
      }
@@ -550,7 +550,6 @@ class CCSDSIGMA: public Task
     mu_lower = mu_min ; 
     mu_upper = mu_max ; 
 
-
     nelec = (nspin == 0 ?  nI : ni) ;
 
     cout << "Nspin" << " " << nspin << " nelec " << nelec << endl ; 
@@ -568,7 +567,7 @@ class CCSDSIGMA: public Task
        vector<CU> gf_inv(norb*norb, {0.,0.}) ;
        vector<int> ipiv(norb,0) ;
 
-       calculate_gf_zero_inv(fock, mu, omega, gf_inv) ;
+       calculate_gf_zero_inv(fock, mu, omegas[nspin][omega], gf_inv) ;
 
        getrf(norb, norb, gf_inv.data(), norb, ipiv.data()) ;
 
@@ -593,12 +592,11 @@ class CCSDSIGMA: public Task
      cout << "total number of electrons: " << trace(density) << endl ;
    } 
 
-   U E2b(vector<CU> &sigma, vector<CU> &gf_original)
-   {
+   U E2b(vector<CU> &sigma, vector<CU> &gf_original){
+   
       U twob_energy = 0. ;
       for (int p = 0; p < norb ;p++) 
        for (int q = 0; q < norb ;q++) 
-        
            twob_energy +=(sigma[p*norb+q].real()*gf_original[p*norb+q].real() - sigma[p*norb+q].imag()*gf_original[p*norb+q].imag()) ;
 
       return twob_energy ;
@@ -696,7 +694,8 @@ class CCSDSIGMA: public Task
 
    U E2b_high_frequency(int nspin,vector<CU> &sigma)
    {
-      vector<CU> sigma_xx(norb*norb,0.0) ;
+//      vector<CU> sigma_xx(norb*norb,0.0) ;
+      vector<CU> sigma_xx(norb*norb,{0.,0.}) ;
  
       for (int p = 0; p < norb ;p++)
       {
@@ -708,16 +707,19 @@ class CCSDSIGMA: public Task
 
       U e2b_hf = 0. ;
       CU omega ;
-      for (int w = nmax; w < 1000000 ;w++)
-      {
-        omega = {0.0,(2.0*w+1)*M_PI/beta} ;      
-      for (int p = 0; p < norb ;p++)
-      {
-        for (int q = 0; q < norb ;q++)
-        {
-         if (p==q) e2b_hf +=  2.0*(-(1.0/omega).imag()*(sigma_xx[p*norb+q]/omega).imag()) ; 
+
+      for (int p = 0; p < norb ;p++){
+        for (int q = 0; q < norb ;q++){
+         if (p==q) e2b_hf +=  (-beta/8.)*(sigma_xx[p*norb+q]).imag() ; 
         }
       }
+
+      for (int w = nmax; w < 10000000 ;w++)
+      {
+        omega = {0.0,(2.0*w+1)*M_PI/beta} ;      
+       for (int p = 0; p < norb ;p++){
+         e2b_hf +=  2.0*(-(1.0/omega).imag()*(sigma_xx[p*norb+p]/omega).imag()) ; 
+       }
       }
 
      return e2b_hf ;
