@@ -211,6 +211,9 @@ class CCSDTDensity : public Task
             if (info != 0) throw runtime_error(str("check diagonalization: Info in geev: %d", info));
 
 
+
+        if (arena.rank == 0) {
+
             cout<<" #orbital occupation" <<endl ;
 
             for (int i=0 ; i < norb ; i++){
@@ -219,6 +222,8 @@ class CCSDTDensity : public Task
              }
 
             printf("total occupancy: %.15f\n", value);
+
+        }
 
             U EIA = scalar(DIA*H.getIA());
             U EAI = scalar(DAI*H.getAI());
