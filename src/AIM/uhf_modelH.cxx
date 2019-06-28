@@ -375,8 +375,6 @@ void uhf_modelh<T>::diagonalizeFock()
 
                 sort(E_sort.begin(), E_sort.end());
 
-
-/*
                 
                 for (int j = 0;j < norb;j++)
                 {
@@ -398,9 +396,8 @@ void uhf_modelh<T>::diagonalizeFock()
                     pairs[j].k = j;
                     pairs[j].d = fock[j];
                 }
-*/
 
-
+/*
                 for (int i = 0;i < norb;i++){
                  for (int j = 0;j < norb;j++){
                   
@@ -408,7 +405,7 @@ void uhf_modelh<T>::diagonalizeFock()
                     pairs[i*norb+j].d = fock[j+E_sort[i].second*norb];
                   }
                 }
-
+*/
                 C.writeRemoteData(irreps, pairs);
             }
         }

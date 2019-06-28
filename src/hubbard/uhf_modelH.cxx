@@ -673,7 +673,7 @@ static const char* spec = R"(
     max_iterations?
         int 150,
     damping_density?
-        double 0., 
+        double 1., 
     conv_type?
         enum { MAXE, RMSE, MAE },
     diis?

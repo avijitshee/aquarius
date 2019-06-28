@@ -150,8 +150,8 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     writeIntegrals(cI[0],cI[0],cI[0],cI[0],H.getIJKL()({0,2},{0,2}),nI[0],nI[0],nI[0],nI[0]);
     writeIntegrals(ci[0],ci[0],ci[0],ci[0],H.getIJKL()({0,0},{0,0}),ni[0],ni[0],ni[0],ni[0]);
 
-    H.getIJKL()({0,2},{0,2})["IJKL"]  = 0.25*H.getIJKL()({0,2},{0,2})["IJKL"];
-    H.getIJKL()({0,0},{0,0})["ijkl"]  = 0.25*H.getIJKL()({0,0},{0,0})["ijkl"];
+    H.getIJKL()({0,2},{0,2})["IJKL"]  = 0.5*H.getIJKL()({0,2},{0,2})["IJKL"];
+    H.getIJKL()({0,0},{0,0})["ijkl"]  = 0.5*H.getIJKL()({0,0},{0,0})["ijkl"];
 
     /*
      * <ab||cd>
@@ -160,8 +160,8 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     writeIntegrals(cA[0],cA[0],cA[0],cA[0],H.getABCD()({2,0},{2,0}),nA[0],nA[0],nA[0],nA[0]);
     writeIntegrals(ca[0],ca[0],ca[0],ca[0],H.getABCD()({0,0},{0,0}),na[0],na[0],na[0],na[0]);
 
-    H.getABCD()({2,0},{2,0})["ABCD"]  = 0.25*H.getABCD()({2,0},{2,0})["ABCD"];
-    H.getABCD()({0,0},{0,0})["abcd"]  = 0.25*H.getABCD()({0,0},{0,0})["abcd"];
+    H.getABCD()({2,0},{2,0})["ABCD"]  = 0.5*H.getABCD()({2,0},{2,0})["ABCD"];
+    H.getABCD()({0,0},{0,0})["abcd"]  = 0.5*H.getABCD()({0,0},{0,0})["abcd"];
 
     /*
      * <ai||bj>
@@ -175,6 +175,7 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
   SymmetryBlockedTensor<U> ABIJ("ABIJ", arena, PointGroup::C1(), 4, {{nA[0]},{nA[0]},{nI[0]},{nI[0]}}, {NS,NS,NS,NS}, false);
   SymmetryBlockedTensor<U> abij("abij", arena, PointGroup::C1(), 4, {{na[0]},{na[0]},{ni[0]},{ni[0]}}, {NS,NS,NS,NS}, false);
 
+
 //  writeIntegrals(true, false, false, true, aijb);
 //  writeIntegrals(true, false, false, true, aijb);
   writeIntegrals(ca[0],ci[0],ci[0],ca[0],aijb,na[0],ni[0],ni[0],na[0]);
@@ -185,11 +186,20 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
   writeIntegrals(ca[0],ca[0],ci[0],ci[0],abij,na[0],na[0],ni[0],ni[0]);
   writeIntegrals(cA[0],cA[0],cI[0],cI[0],ABIJ,nA[0],nA[0],nI[0],nI[0]);
 
+
+    this->log(arena) << "AIBJ: Should be 0 " << setprecision(15) << ABIJ.norm(2) << endl;
+    this->log(arena) << "aibj: should be 0 " << setprecision(15) << abij.norm(2) << endl;
+
   writeIntegrals(cA[0],ci[0],cA[0],ci[0],H.getAIBJ()({1,0},{1,0}),nA[0],ni[0],nA[0],ni[0]);
 
   writeIntegrals(cA[0],cI[0],cA[0],cI[0],H.getAIBJ()({1,1},{1,1}),nA[0],nI[0],nA[0],nI[0]);
   writeIntegrals(ca[0],cI[0],ca[0],cI[0],H.getAIBJ()({0,1},{0,1}),na[0],nI[0],na[0],nI[0]);
   writeIntegrals(ca[0],ci[0],ca[0],ci[0],H.getAIBJ()({0,0},{0,0}),na[0],ni[0],na[0],ni[0]);
+
+
+    this->log(arena) << "AIBJ: Should be 0 " << setprecision(15) << H.getAIBJ()({1,1},{1,1}).norm(2) << endl;
+    this->log(arena) << "aibj: should be 0 " << setprecision(15) << H.getAIBJ()({0,0},{0,0}).norm(2) << endl;
+
 
 //  writeIntegrals(cA[0],ci[0],ca[0],cI[0],H.getAIBJ()({1,0},{0,1}),nA[0],ni[0],na[0],nI[0]);
 //  writeIntegrals(ca[0],cI[0],cA[0],ci[0],H.getAIBJ()({0,1},{1,0}),na[0],nI[0],nA[0],ni[0]);
@@ -208,6 +218,8 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
 
    H.getAIBJ()({0,0},{0,0})["aibj"] -= abij["abji"]  ;
    H.getAIBJ()({1,1},{1,1})["AIBJ"] -= ABIJ["ABJI"] ;
+
+
 
 // H.getAIBJ()({1,1},{1,1})["AIBJ"]  =     H.getAIBJ()({1,0},{1,0})["AIBJ"];
 // H.getAIBJ()({0,1},{0,1})["aIbJ"]  =     H.getAIBJ()({1,0},{1,0})["aIbJ"];
@@ -235,13 +247,48 @@ bool Hubbard_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     H.getIJAB()({0,2},{2,0})["IJAB"]  =     H.getABIJ()({2,0},{0,2})["ABIJ"];
     H.getIJAB()({0,1},{1,0})["IjAb"]  =     H.getABIJ()({1,0},{0,1})["AbIj"];
     H.getIJAB()({0,0},{0,0})["ijab"]  =     H.getABIJ()({0,0},{0,0})["abij"];
-
-    printf("print scalar prod IJKL: %.15f\n",real(scalar(H.getIJKL()*H.getIJKL()))) ;
+/*
+    printf("print scalar prod IJKL: %.15f\n",real(scalar(H.getIJKL()({2,0},{2,0})*H.getIJKL()({2,0},{2,0})))) ;
     printf("print scalar prod ABCD: %.15f\n",real(scalar(H.getABCD()*H.getABCD()))) ;
     printf("print scalar prod AIBJ: %.15f\n",real(scalar(H.getAIBJ()*H.getAIBJ()))) ;
     printf("print scalar prod IJAK: %.15f\n",real(scalar(H.getIJAK()*H.getIJAK()))) ;
     printf("print scalar prod ABCI: %.15f\n",real(scalar(H.getABCI()*H.getABCI()))) ;
     printf("print scalar prod IJAB: %.15f\n",real(scalar(H.getABIJ()*H.getABIJ()))) ;
+*/
+    this->log(arena) << "ABCD: " << setprecision(15) << H.getABCD()({2,0},{2,0}).norm(2) << endl;
+    this->log(arena) << "AbCd: " << setprecision(15) << H.getABCD()({1,0},{1,0}).norm(2) << endl;
+    this->log(arena) << "abcd: " << setprecision(15) << H.getABCD()({0,0},{0,0}).norm(2) << endl;
+    this->log(arena) << "ABCI: " << setprecision(15) << H.getABCI()({2,0},{1,1}).norm(2) << endl;
+    this->log(arena) << "AbCi: " << setprecision(15) << H.getABCI()({1,0},{1,0}).norm(2) << endl;
+    this->log(arena) << "AbcI: " << setprecision(15) << H.getABCI()({1,0},{0,1}).norm(2) << endl;
+    this->log(arena) << "abci: " << setprecision(15) << H.getABCI()({0,0},{0,0}).norm(2) << endl;
+    this->log(arena) << "AIBC: " << setprecision(15) << H.getAIBC()({1,1},{2,0}).norm(2) << endl;
+    this->log(arena) << "AiBc: " << setprecision(15) << H.getAIBC()({1,0},{1,0}).norm(2) << endl;
+    this->log(arena) << "aIBc: " << setprecision(15) << H.getAIBC()({0,1},{1,0}).norm(2) << endl;
+    this->log(arena) << "aibc: " << setprecision(15) << H.getAIBC()({0,0},{0,0}).norm(2) << endl;
+    this->log(arena) << "ABIJ: " << setprecision(15) << H.getABIJ()({2,0},{0,2}).norm(2) << endl;
+    this->log(arena) << "AbIj: " << setprecision(15) << H.getABIJ()({1,0},{0,1}).norm(2) << endl;
+    this->log(arena) << "abij: " << setprecision(15) << H.getABIJ()({0,0},{0,0}).norm(2) << endl;
+    this->log(arena) << "AIBJ: " << setprecision(15) << H.getAIBJ()({1,1},{1,1}).norm(2) << endl;
+    this->log(arena) << "AiBj: " << setprecision(15) << H.getAIBJ()({1,0},{1,0}).norm(2) << endl;
+    this->log(arena) << "aIbJ: " << setprecision(15) << H.getAIBJ()({0,1},{0,1}).norm(2) << endl;
+    this->log(arena) << "AibJ: " << setprecision(15) << H.getAIBJ()({1,0},{0,1}).norm(2) << endl;
+    this->log(arena) << "aIBj: " << setprecision(15) << H.getAIBJ()({0,1},{1,0}).norm(2) << endl;
+    this->log(arena) << "aibj: " << setprecision(15) << H.getAIBJ()({0,0},{0,0}).norm(2) << endl;
+    this->log(arena) << "IJAB: " << setprecision(15) << H.getIJAB()({0,2},{2,0}).norm(2) << endl;
+    this->log(arena) << "IjAb: " << setprecision(15) << H.getIJAB()({0,1},{1,0}).norm(2) << endl;
+    this->log(arena) << "ijab: " << setprecision(15) << H.getIJAB()({0,0},{0,0}).norm(2) << endl;
+    this->log(arena) << "AIJK: " << setprecision(15) << H.getAIJK()({1,1},{0,2}).norm(2) << endl;
+    this->log(arena) << "AiJk: " << setprecision(15) << H.getAIJK()({1,0},{0,1}).norm(2) << endl;
+    this->log(arena) << "aIJk: " << setprecision(15) << H.getAIJK()({0,1},{0,1}).norm(2) << endl;
+    this->log(arena) << "aijk: " << setprecision(15) << H.getAIJK()({0,0},{0,0}).norm(2) << endl;
+    this->log(arena) << "IJAK: " << setprecision(15) << H.getIJAK()({0,2},{1,1}).norm(2) << endl;
+    this->log(arena) << "IjAk: " << setprecision(15) << H.getIJAK()({0,1},{1,0}).norm(2) << endl;
+    this->log(arena) << "IjaK: " << setprecision(15) << H.getIJAK()({0,1},{0,1}).norm(2) << endl;
+    this->log(arena) << "ijak: " << setprecision(15) << H.getIJAK()({0,0},{0,0}).norm(2) << endl;
+    this->log(arena) << "IJKL: " << setprecision(15) << H.getIJKL()({0,2},{0,2}).norm(2) << endl;
+    this->log(arena) << "IjKl: " << setprecision(15) << H.getIJKL()({0,1},{0,1}).norm(2) << endl;
+    this->log(arena) << "ijkl: " << setprecision(15) << H.getIJKL()({0,0},{0,0}).norm(2) << endl;
 
     return true;
 }

@@ -141,14 +141,16 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
          H.getABCI()({2,0},{1,1})({0,0,0,0})["ABCI"] = tmp2["ABCS"]*cI_({0,0})["SI"];
      }
 
+       SymmetryBlockedTensor<U> aBcI("aBcI", arena, PointGroup::C1(), 4, {{na[0]},{nA[0]},{na[0]},{nI[0]}}, {NS,NS,NS,NS}, false);
+
      {
-         CTFTensor<U> tmp("tmp", arena, 4, {nA[0],N[0],N[0],N[0]}, {NS,NS,NS,NS});
-         tmp["AQRS"] = X({0,0,0,0})["PQRS"]*cA_({0,0})["PA"];
-         CTFTensor<U> tmp1("tmp1", arena, 4, {nA[0],na[0],N[0],N[0]}, {NS,NS,NS,NS});
-         tmp1["AbRS"] =   tmp["AQRS"]*ca_({0,0})["Qb"];
-         CTFTensor<U> tmp2("tmp2", arena, 4, {nA[0],na[0],na[0],N[0]}, {NS,NS,NS,NS});
-         tmp2["AbcS"] = tmp1["AbRS"]*ca_({0,0})["Rc"];
-         H.getABCI()({1,0},{0,1})({0,0,0,0})["AbcI"] =   tmp2["AbcS"]*cI_({0,0})["SI"];
+         CTFTensor<U> tmp("tmp", arena, 4, {na[0],N[0],N[0],N[0]}, {NS,NS,NS,NS});
+         tmp["aQRS"] = X({0,0,0,0})["PQRS"]*ca_({0,0})["Pa"];
+         CTFTensor<U> tmp1("tmp1", arena, 4, {na[0],nA[0],N[0],N[0]}, {NS,NS,NS,NS});
+         tmp1["aBRS"] =   tmp["aQRS"]*cA_({0,0})["QB"];
+         CTFTensor<U> tmp2("tmp2", arena, 4, {na[0],nA[0],na[0],N[0]}, {NS,NS,NS,NS});
+         tmp2["aBcS"] = tmp1["aBRS"]*ca_({0,0})["Rc"];
+         aBcI({0,0,0,0})["aBcI"] =   tmp2["aBcS"]*cI_({0,0})["SI"];
      }
 
      {
@@ -163,7 +165,6 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
 
 /* ABIJ
  */
-
      {
          CTFTensor<U> tmp("tmp", arena, 4, {nA[0],N[0],N[0],N[0]}, {NS,NS,NS,NS});
          tmp["AQRS"] = X({0,0,0,0})["PQRS"]*cA_({0,0})["PA"];
@@ -280,16 +281,16 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
         H.getAIJK()({0,0},{0,0})({0,0,0,0})["aijk"] =   tmp2["aijS"]*ci_({0,0})["Sk"];
      }
 
+       SymmetryBlockedTensor<U> aIkJ("aIkJ", arena, PointGroup::C1(), 4, {{na[0]},{nI[0]},{ni[0]},{nI[0]}}, {NS,NS,NS,NS}, false);
 
      {
         CTFTensor<U> tmp("tmp", arena, 4, {na[0],N[0],N[0],N[0]}, {NS,NS,NS,NS});
         tmp["aQRS"] = X({0,0,0,0})["PQRS"]*ca_({0,0})["Pa"];
         CTFTensor<U> tmp1("tmp1", arena, 4, {na[0],nI[0],N[0],N[0]}, {NS,NS,NS,NS});
         tmp1["aIRS"] = tmp["aQRS"]*cI_({0,0})["QI"];
- 
-        CTFTensor<U> tmp2("tmp2", arena, 4, {na[0],nI[0],nI[0],N[0]}, {NS,NS,NS,NS});
-        tmp2["aIJS"] = tmp1["aIRS"]*cI_({0,0})["RJ"];
-        H.getAIJK()({0,1},{0,1})({0,0,0,0})["aIJk"] =   tmp2["aIJS"]*ci_({0,0})["Sk"];
+        CTFTensor<U> tmp2("tmp2", arena, 4, {na[0],nI[0],ni[0],N[0]}, {NS,NS,NS,NS});
+        tmp2["aIkS"] = tmp1["aIRS"]*ci_({0,0})["Rk"];
+        aIkJ({0,0,0,0})["aIkJ"] =  tmp2["aIkS"]*cI_({0,0})["SJ"];
      }
 
 /* IJKL
@@ -329,8 +330,8 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
          H.getIJKL()({0,0},{0,0})({0,0,0,0})["ijkl"] =   0.5*tmp2["ijkS"]*ci_({0,0})["Sl"];
      }
 
-        H.getAIJK()({0,1},{0,1})["aIjK"]  =    -H.getAIJK()({0,1},{0,1})["aIKj"];
-        H.getABCI()({1,0},{0,1})["bAcI"]  =    -H.getABCI()({1,0},{0,1})["AbcI"];
+        H.getAIJK()({0,1},{0,1})["aIKj"]  =    -aIkJ["aIjK"];
+        H.getABCI()({1,0},{0,1})["bAcI"]  =    -aBcI["AbcI"];
 
         H.getAIBJ()({1,1},{1,1})["AIBJ"] -= ABIJ["ABJI"];
         H.getAIBJ()({0,0},{0,0})["aibj"] -= abij["abji"];
@@ -354,42 +355,6 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
         H.getIJAB()({0,2},{2,0})["IJAB"]  =     H.getABIJ()({2,0},{0,2})["ABIJ"];
         H.getIJAB()({0,1},{1,0})["IjAb"]  =     H.getABIJ()({1,0},{0,1})["AbIj"];
         H.getIJAB()({0,0},{0,0})["ijab"]  =     H.getABIJ()({0,0},{0,0})["abij"];
-
-    this->log(arena) << "ABCD: " << setprecision(15) << H.getABCD()({2,0},{2,0}).norm(2) << endl;
-    this->log(arena) << "AbCd: " << setprecision(15) << H.getABCD()({1,0},{1,0}).norm(2) << endl;
-    this->log(arena) << "abcd: " << setprecision(15) << H.getABCD()({0,0},{0,0}).norm(2) << endl;
-    this->log(arena) << "ABCI: " << setprecision(15) << H.getABCI()({2,0},{1,1}).norm(2) << endl;
-    this->log(arena) << "AbCi: " << setprecision(15) << H.getABCI()({1,0},{1,0}).norm(2) << endl;
-    this->log(arena) << "AbcI: " << setprecision(15) << H.getABCI()({1,0},{0,1}).norm(2) << endl;
-    this->log(arena) << "abci: " << setprecision(15) << H.getABCI()({0,0},{0,0}).norm(2) << endl;
-    this->log(arena) << "AIBC: " << setprecision(15) << H.getAIBC()({1,1},{2,0}).norm(2) << endl;
-    this->log(arena) << "AiBc: " << setprecision(15) << H.getAIBC()({1,0},{1,0}).norm(2) << endl;
-    this->log(arena) << "aIBc: " << setprecision(15) << H.getAIBC()({0,1},{1,0}).norm(2) << endl;
-    this->log(arena) << "aibc: " << setprecision(15) << H.getAIBC()({0,0},{0,0}).norm(2) << endl;
-    this->log(arena) << "ABIJ: " << setprecision(15) << H.getABIJ()({2,0},{0,2}).norm(2) << endl;
-    this->log(arena) << "AbIj: " << setprecision(15) << H.getABIJ()({1,0},{0,1}).norm(2) << endl;
-    this->log(arena) << "abij: " << setprecision(15) << H.getABIJ()({0,0},{0,0}).norm(2) << endl;
-    this->log(arena) << "AIBJ: " << setprecision(15) << H.getAIBJ()({1,1},{1,1}).norm(2) << endl;
-    this->log(arena) << "AiBj: " << setprecision(15) << H.getAIBJ()({1,0},{1,0}).norm(2) << endl;
-    this->log(arena) << "aIbJ: " << setprecision(15) << H.getAIBJ()({0,1},{0,1}).norm(2) << endl;
-    this->log(arena) << "AibJ: " << setprecision(15) << H.getAIBJ()({1,0},{0,1}).norm(2) << endl;
-    this->log(arena) << "aIBj: " << setprecision(15) << H.getAIBJ()({0,1},{1,0}).norm(2) << endl;
-    this->log(arena) << "aibj: " << setprecision(15) << H.getAIBJ()({0,0},{0,0}).norm(2) << endl;
-    this->log(arena) << "IJAB: " << setprecision(15) << H.getIJAB()({0,2},{2,0}).norm(2) << endl;
-    this->log(arena) << "IjAb: " << setprecision(15) << H.getIJAB()({0,1},{1,0}).norm(2) << endl;
-    this->log(arena) << "ijab: " << setprecision(15) << H.getIJAB()({0,0},{0,0}).norm(2) << endl;
-    this->log(arena) << "AIJK: " << setprecision(15) << H.getAIJK()({1,1},{0,2}).norm(2) << endl;
-    this->log(arena) << "AiJk: " << setprecision(15) << H.getAIJK()({1,0},{0,1}).norm(2) << endl;
-    this->log(arena) << "aIJk: " << setprecision(15) << H.getAIJK()({0,1},{0,1}).norm(2) << endl;
-    this->log(arena) << "aijk: " << setprecision(15) << H.getAIJK()({0,0},{0,0}).norm(2) << endl;
-    this->log(arena) << "IJAK: " << setprecision(15) << H.getIJAK()({0,2},{1,1}).norm(2) << endl;
-    this->log(arena) << "IjAk: " << setprecision(15) << H.getIJAK()({0,1},{1,0}).norm(2) << endl;
-    this->log(arena) << "IjaK: " << setprecision(15) << H.getIJAK()({0,1},{0,1}).norm(2) << endl;
-    this->log(arena) << "ijak: " << setprecision(15) << H.getIJAK()({0,0},{0,0}).norm(2) << endl;
-    this->log(arena) << "IJKL: " << setprecision(15) << H.getIJKL()({0,2},{0,2}).norm(2) << endl;
-    this->log(arena) << "IjKl: " << setprecision(15) << H.getIJKL()({0,1},{0,1}).norm(2) << endl;
-    this->log(arena) << "ijkl: " << setprecision(15) << H.getIJKL()({0,0},{0,0}).norm(2) << endl;
-
 
     return true;
 }
