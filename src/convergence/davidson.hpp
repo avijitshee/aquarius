@@ -395,7 +395,7 @@ class Davidson : public task::Destructible
         }
 
         template <typename c_container, typename hc_container>
-        enable_if_t<is_same<typename decay_t<c_container>::value_type, T>::value, vector<dtype>>
+        enable_if<is_same<typename decay<c_container>::value_type, T>::value, vector<dtype>>
         extrapolate(c_container&& c, hc_container&& hc, const op::Denominator<dtype>& D)
         {
             assert((nc == 1 && nvec  > 1) ||
@@ -421,7 +421,7 @@ class Davidson : public task::Destructible
         }
 
         template <typename c_container, typename hc_container>
-        enable_if_t<is_same<typename decay_t<c_container>::value_type::value_type, T>::value, vector<dtype>>
+        enable_if<is_same<typename decay<c_container>::value_type::value_type, T>::value, vector<dtype>>
         extrapolate(c_container&& c, hc_container&& hc, const op::Denominator<dtype>& D)
         {
             using slice::all;
@@ -758,7 +758,7 @@ class Davidson : public task::Destructible
         }
 
         template <typename guess_container>
-        enable_if_t<is_same<typename decay_t<guess_container>::value_type,T>::value>
+        enable_if<is_same<typename decay<guess_container>::value_type,T>::value>
         reset(const guess_container& gs, int nc = 1, InnerProd innerProd = InnerProd(), Weight weight = Weight())
         {
             this->nc = nc;
@@ -785,7 +785,7 @@ class Davidson : public task::Destructible
         }
 
         template <typename guess_container>
-        enable_if_t<is_same<typename decay_t<guess_container>::value_type::value_type,T>::value>
+        enable_if<is_same<typename decay<guess_container>::value_type::value_type,T>::value>
         reset(const guess_container& gs, int nc = 1, InnerProd innerProd = InnerProd(), Weight weight = Weight())
         {
             this->nc = nc;
