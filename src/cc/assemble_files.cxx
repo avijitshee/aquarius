@@ -209,6 +209,7 @@ class Assemble_Files: public Task
                 norm_ea[p].emplace_back(val) ; 
               }
 
+              return true ;
         }
  };
 }

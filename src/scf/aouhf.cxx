@@ -1,4 +1,5 @@
 #include "aouhf.hpp"
+#include <mkl_cblas.h>
 
 using namespace aquarius::tensor;
 using namespace aquarius::input;
@@ -84,13 +85,11 @@ void AOUHF<T,WhichUHF>::buildFock()
           std::copy(coefficient.begin(), coefficient.end(),std::back_inserter(densa[i])); 
          }
   
-       if (coeff_exists) densb[i] = densa[i] ; 
+       if (coeff_exists){ densb[i] = densa[i] ; 
 
+          energy_firstiter  += 0.5*(cblas_ddot(norb[i]*norb[i], focka[i].data(), 1, densa[i].data(), 1) +cblas_ddot(norb[i]*norb[i], fockb[i].data(), 1, densb[i].data(), 1)) ;
+        } 
 
-      for (int j = 0;j < norb[i]*norb[i];j++)
-      {
-        energy_firstiter  += 0.5*(focka[i][j]*densa[i][j] + fockb[i][j]*densb[i][j]) ;
-      } 
 
         densab[i] = densa[i];
         //PROFILE_FLOPS(norb[i]*norb[i]);
@@ -281,19 +280,14 @@ void AOUHF<T,WhichUHF>::buildFock()
             Fa.writeRemoteData(irreps);
             Fb.writeRemoteData(irreps);
         }
+       if (coeff_exists){  
+         energy_firstiter  += 0.5*(cblas_ddot(norb[i]*norb[i], focka[i].data(), 1, densa[i].data(), 1) +cblas_ddot(norb[i]*norb[i], fockb[i].data(), 1, densb[i].data(), 1)) ;
+
+        Logger::log(arena) << "energy from 1st iteration: " << setprecision(10) << energy_firstiter+molecule.getNuclearRepulsion() << endl ;
+
+        } 
+
     }
-
-    for (int i = 0;i < nirrep;i++)
-    {
-      for (int j = 0;j < norb[i]*norb[i];j++)
-      {
-        energy_firstiter  += 0.5*(focka[i][j]*densa[i][j] + fockb[i][j]*densb[i][j]) ;
-      } 
-    }
-
-    cout << "energy from 1st iteration " << endl ;
-
-    cout << setprecision(10) << energy_firstiter+molecule.getNuclearRepulsion() << endl ;
 
 }
 
