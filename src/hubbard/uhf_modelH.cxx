@@ -41,7 +41,7 @@ uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
 template <typename T>
 bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   auto& hubbard =this->template get<Hubbard>("hubbard");
    int norb = hubbard.getNumOrbitals();
    int nalpha = hubbard.getNumAlphaElectrons();
    int nbeta = hubbard.getNumBetaElectrons();
@@ -183,7 +183,7 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 template <typename T>
 void uhf_modelh<T>::iterate(const Arena& arena)
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   auto& hubbard =this->template get<Hubbard>("hubbard");
    int norb = hubbard.getNumOrbitals();
    int nalpha = hubbard.getNumAlphaElectrons();
    int nbeta = hubbard.getNumBetaElectrons();
@@ -247,7 +247,7 @@ void uhf_modelh<T>::iterate(const Arena& arena)
 template <typename T>
 void uhf_modelh<T>::calcSMinusHalf()
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   auto& hubbard =this->template get<Hubbard>("hubbard");
    const int norb = hubbard.getNumOrbitals();
    int nalpha = hubbard.getNumAlphaElectrons();
    int nbeta = hubbard.getNumBetaElectrons();
@@ -311,7 +311,7 @@ void uhf_modelh<T>::calcSMinusHalf()
 template <typename T>
 void uhf_modelh<T>::diagonalizeFock()
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   auto& hubbard =this->template get<Hubbard>("hubbard");
    const int norb = hubbard.getNumOrbitals();
    int nalpha = hubbard.getNumAlphaElectrons();
    int nbeta = hubbard.getNumBetaElectrons();
@@ -405,7 +405,7 @@ void uhf_modelh<T>::diagonalizeFock()
 template <typename T>
 void uhf_modelh<T>::calcS2()
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   auto& hubbard =this->template get<Hubbard>("hubbard");
    const int norb = hubbard.getNumOrbitals();
    int nalpha = hubbard.getNumAlphaElectrons();
    int nbeta = hubbard.getNumBetaElectrons();
@@ -464,7 +464,7 @@ void uhf_modelh<T>::calcEnergy()
 template <typename T>
 void uhf_modelh<T>::calcDensity()
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   auto& hubbard =this->template get<Hubbard>("hubbard");
    const int norb = hubbard.getNumOrbitals();
    int nalpha = hubbard.getNumAlphaElectrons();
    int nbeta = hubbard.getNumBetaElectrons();
@@ -496,7 +496,7 @@ void uhf_modelh<T>::calcDensity()
 template <typename T>
 void uhf_modelh<T>::buildFock()
 {
-   auto& hubbard =this->template get<Hubbard <T>>("hubbard");
+   auto& hubbard =this->template get<Hubbard>("hubbard");
    const int norb = hubbard.getNumOrbitals();
    int nirrep = hubbard.getNumIrreps() ;
 

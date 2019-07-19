@@ -15,7 +15,6 @@ namespace aquarius
 namespace hubbard
 {
 
-template <typename U>
 class Hubbard 
 {
     friend class HubbardTask;
@@ -32,15 +31,15 @@ class Hubbard
         int nbeta;
         int multiplicity ;
         int nirreps = 1;
-        vector<U> integral_diagonal ;
-        vector<U> integral_offdiagonal ;
+        vector<double> integral_diagonal ;
+        vector<double> integral_offdiagonal ;
         vector<int> alpha_array ;
         vector<int> beta_array ;
         string openshell_alpha ;
         string openshell_beta ; 
 
     public:
-        vector<U> v_onsite ;
+        vector<double> v_onsite ;
         Hubbard(const string& name, input::Config& config);
         int getNumAlphaElectrons()
         {
@@ -84,8 +83,8 @@ class Hubbard
         void read_1e_integrals()
         {
           std::ifstream one_diag("one_diag.txt");
-          std::istream_iterator<U> start(one_diag), end;
-          std::vector<U> diagonal(start, end);
+          std::istream_iterator<double> start(one_diag), end;
+          std::vector<double> diagonal(start, end);
           std::cout << "Read " << diagonal.size() << " numbers" << std::endl;
           std::copy(diagonal.begin(), diagonal.end(),std::back_inserter(integral_diagonal)); 
         }
@@ -93,14 +92,13 @@ class Hubbard
         void read_2e_integrals()
         {
           std::ifstream onsite("onsite.txt");
-          std::istream_iterator<U> start(onsite), end;
-          std::vector<U> int_onsite(start, end);
+          std::istream_iterator<double> start(onsite), end;
+          std::vector<double> int_onsite(start, end);
           std::cout << "Read " << int_onsite.size() << " numbers" << std::endl;
 
           std::copy(int_onsite.begin(), int_onsite.end(), std::back_inserter(v_onsite)) ;
         }
 
-//        bool run(task::TaskDAG& dag, const Arena& arena);
 };
 
 class HubbardTask : public task::Task                                                                                               

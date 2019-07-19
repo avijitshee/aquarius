@@ -26,7 +26,7 @@ ReadInts<U>::ReadInts(const string& name, input::Config& config)
 template <typename U>
 bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
 {
-    auto& hubbard =this->template get<Hubbard <U>>("hubbard");
+    auto& hubbard =this->template get<Hubbard>("hubbard");
 
     vector<int> alpha_array ;
     vector<int> beta_array ;

@@ -15,7 +15,6 @@ namespace aquarius
 namespace aim
 {
 
-template <typename U>
 class AIM 
 {
     friend class AIMTask;

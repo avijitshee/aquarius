@@ -19,12 +19,11 @@ AIMTask::AIMTask(const string& name, input::Config& config)
 
 bool AIMTask::run(task::TaskDAG& dag, const Arena& arena)
 {
-    put("aim", new AIM<double>::AIM("aim", config));
+    put("aim", new AIM("aim", config));
     return true;
 }
 
-template <typename U>
-AIM<U>::AIM(const string& name,input::Config& config)
+AIM::AIM(const string& name,input::Config& config)
 {
    alpha_elec = config.get<int>("alpha_elec");
    beta_elec = config.get<int>("beta_elec");

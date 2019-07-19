@@ -42,7 +42,7 @@ uhf_modelh<T>::uhf_modelh(const string& name, Config& config)
 template <typename T>
 bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 {
-   auto& aim =this->template get<AIM <T>>("aim");
+   auto& aim =this->template get<AIM>("aim");
    int norb = aim.getNumOrbitals();
    int nalpha = aim.getNumAlphaElectrons();
    int nbeta = aim.getNumBetaElectrons();
@@ -184,7 +184,7 @@ bool uhf_modelh<T>::run(TaskDAG& dag, const Arena& arena)
 template <typename T>
 void uhf_modelh<T>::iterate(const Arena& arena)
 {
-   auto& aim =this->template get<AIM <T>>("aim");
+   auto& aim =this->template get<AIM>("aim");
    int norb = aim.getNumOrbitals();
    int nalpha = aim.getNumAlphaElectrons();
    int nbeta = aim.getNumBetaElectrons();
@@ -248,7 +248,7 @@ void uhf_modelh<T>::iterate(const Arena& arena)
 template <typename T>
 void uhf_modelh<T>::calcSMinusHalf()
 {
-   auto& aim =this->template get<AIM <T>>("aim");
+   auto& aim =this->template get<AIM>("aim");
    const int norb = aim.getNumOrbitals();
    int nalpha = aim.getNumAlphaElectrons();
    int nbeta = aim.getNumBetaElectrons();
@@ -312,7 +312,7 @@ void uhf_modelh<T>::calcSMinusHalf()
 template <typename T>
 void uhf_modelh<T>::diagonalizeFock()
 {
-   auto& aim =this->template get<AIM <T>>("aim");
+   auto& aim =this->template get<AIM>("aim");
    const int norb = aim.getNumOrbitals();
    int nalpha = aim.getNumAlphaElectrons();
    int nbeta = aim.getNumBetaElectrons();
@@ -425,7 +425,7 @@ void uhf_modelh<T>::diagonalizeFock()
 template <typename T>
 void uhf_modelh<T>::calcS2()
 {
-   auto& aim =this->template get<AIM <T>>("aim");
+   auto& aim =this->template get<AIM>("aim");
    const int norb = aim.getNumOrbitals();
    int nalpha = aim.getNumAlphaElectrons();
    int nbeta = aim.getNumBetaElectrons();
@@ -484,7 +484,7 @@ void uhf_modelh<T>::calcEnergy()
 template <typename T>
 void uhf_modelh<T>::calcDensity()
 {
-   auto& aim =this->template get<AIM <T>>("aim");
+   auto& aim =this->template get<AIM>("aim");
    const int norb = aim.getNumOrbitals();
    int nalpha = aim.getNumAlphaElectrons();
    int nbeta = aim.getNumBetaElectrons();
@@ -516,7 +516,7 @@ void uhf_modelh<T>::calcDensity()
 template <typename T>
 void uhf_modelh<T>::buildFock()
 {
-   auto& aim =this->template get<AIM <T>>("aim");
+   auto& aim =this->template get<AIM>("aim");
    const int norb = aim.getNumOrbitals();
    int nirrep = aim.getNumIrreps() ;
 

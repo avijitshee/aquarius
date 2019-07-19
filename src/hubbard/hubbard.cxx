@@ -2,8 +2,6 @@
 
 using namespace aquarius::input;
 using namespace aquarius::task;
-using namespace aquarius::op;
-using namespace aquarius::tensor;
 using namespace aquarius::symmetry;
 
 namespace aquarius
@@ -19,11 +17,11 @@ HubbardTask::HubbardTask(const string& name, input::Config& config)
 
 bool HubbardTask::run(task::TaskDAG& dag, const Arena& arena)
 {
-    put("hubbard", new Hubbard<double>::Hubbard("hubbard", config));
+    put("hubbard", new Hubbard("hubbard", config));
+    return true;
 }
 
-template <typename U>
-Hubbard<U>::Hubbard(const string& name,input::Config& config)
+Hubbard::Hubbard(const string& name,input::Config& config)
 {
    nelec = config.get<int>("num_electrons");
    norb = config.get<int>("num_orbitals");
