@@ -214,6 +214,7 @@ class Assemble_Files: public Task
                 norm_ea[countline] = val ; 
                 countline++ ;
               }
+             return true ;
            }
 
         }
