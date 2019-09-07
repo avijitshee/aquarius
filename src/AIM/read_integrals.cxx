@@ -98,37 +98,25 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     vector<tkv_pair<U>> ov_pairs;
 
     for (int i = 0;i < norb;i++)
-    {
-        ov_pairs.emplace_back(i*norb+i, 1);
-    }
-
+     for (int j = 0;j < norb;j++)
+        ov_pairs.emplace_back(i*norb+i, ovlp[i*norb+j]);
 
    if (coeff_exists) 
    {
     for (int i = 0;i < norb;i++)
-    {
        for (int j = 0;j < norb;j++)
-       {
         dapairs.emplace_back(i*norb+j, Dalpha[i][j]);
-       }
-    }
 
-   for (int i = 0;i < norb;i++){
+   for (int i = 0;i < norb;i++)
        for (int j = 0;j < norb;j++)
-       {
         dbpairs.emplace_back(i*norb+j, Dbeta[i][j]);
-       }
-    }
    }
    else{
-    for (int i = 0;i < nalpha;i++){
+    for (int i = 0;i < nalpha;i++)
         dapairs.emplace_back(i*norb+i,1) ;
-    }
 
-    for (int i = 0;i < nbeta;i++){
+    for (int i = 0;i < nbeta;i++)
         dbpairs.emplace_back(i*norb+i,1) ;
-    }
-
    }
 
     for (int i = 0;i < norb;i++){

@@ -22,6 +22,7 @@ class ReadInts : public task::Task
     protected:
         vector<U> int_a ;
         vector<U> int_b ;
+        vector<U> ovlp ;
         vector<U> mo_coeff ;
         bool coeff_exists = false ;
 
@@ -63,6 +64,28 @@ class ReadInts : public task::Task
 
            }
         }
+
+        void read_overlap(const int norb)
+        {
+
+           ovlp.resize(norb*norb) ;
+
+           string path_overlap = "overlap.txt";
+
+           ifstream ifs(path_overlap);
+           string line;
+
+           while (getline(ifs, line))
+           {    
+              U vala;
+              int p, q;
+              istringstream(line) >> p >> q >> vala ;
+
+              ovlp[p*norb+q]  = vala; 
+
+           }
+        }
+
 
         bool run(task::TaskDAG& dag, const Arena& arena);                                                                            
 };

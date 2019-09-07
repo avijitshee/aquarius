@@ -19,6 +19,7 @@ AIM_AOMOints<U>::AIM_AOMOints(const string& name, Config& config)
 : AIM_MOIntegrals<U>(name, config), path(config.get<string>("filename"))
 {
    int nirreps = 1 ;
+   nimporbs = config.get<int>("num_imp_orbitals");
 }
 
 template <typename U>
@@ -41,7 +42,9 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
     auto& Fa = this->template get<SymmetryBlockedTensor<U>>("Fa");
     auto& Fb = this->template get<SymmetryBlockedTensor<U>>("Fb");
 
-    const vector<int>& N = occ.nao; // this must be reduced to the number of system orbitals..
+//    const vector<int>& N = occ.nao; // this must be reduced to the number of system orbitals..
+    vector<int> N  ; // this must be reduced to the number of system orbitals..
+    N.push_back(nimporbs) ; 
     const vector<int>& nI = occ.nalpha;
     const vector<int>& ni = occ.nbeta;
     const vector<int>& nA = vrt.nalpha;
@@ -65,13 +68,12 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
        U val;
        int p, q, k, l;
        istringstream(line) >> p >> q >> k >> l >> val;
-       countline = ((p*N[0]+k)*N[0]+q)*N[0]+l ;  //mulliken to direc ordered
+       countline = ((p*N[0]+k)*N[0]+q)*N[0]+l ;  //mulliken to dirac ordered
        ijklpairs.emplace_back(countline,val);
     }
     X.writeRemoteData({0,0,0,0},ijklpairs);
    }
-   else
-   {
+   else{
     X.writeRemoteData({0,0,0,0});
    } 
 
@@ -365,7 +367,8 @@ bool AIM_AOMOints<U>::run(TaskDAG& dag, const Arena& arena)
 static const char* spec = R"!(
 
 filename?
-    string v_no_sub.txt
+    string v_no_sub.txt,
+    num_imp_orbitals int
 )!";
 
 INSTANTIATE_SPECIALIZATIONS(aquarius::aim::AIM_AOMOints);

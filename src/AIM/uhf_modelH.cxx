@@ -592,7 +592,7 @@ void uhf_modelh<T>::buildFock()
       ifstream ifs(path);
       string line;
 
-      if (this->iter() > 0) {
+      if (this->iter() > 1) {
         densab[i] = densa[i];
         axpy(norb*norb, 1.0, densb[i].data(), 1, densab[i].data(), 1);
 

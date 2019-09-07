@@ -19,7 +19,7 @@ class AIM_AOMOints : public AIM_MOIntegrals<T>
         AIM_AOMOints(const string& name, input::Config& config);
 
     protected:
-        int norb ; 
+        int nimporbs ; 
         string path ;
         bool run(task::TaskDAG& dag, const Arena& arena);
 };
