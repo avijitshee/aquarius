@@ -728,6 +728,8 @@ static const char* spec = R"(
         string fock.txt,
     filename_v?
         string v_no_sub.txt,
+    filename_overlap?
+        string overlap.txt,
     frozen_core?
         bool false,
     convergence?
