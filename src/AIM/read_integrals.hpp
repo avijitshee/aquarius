@@ -24,6 +24,7 @@ class ReadInts : public task::Task
         vector<U> int_b ;
         vector<U> ovlp ;
         vector<U> mo_coeff ;
+        string path_overlap ;
         bool coeff_exists = false ;
 
     public:
@@ -70,7 +71,7 @@ class ReadInts : public task::Task
 
            ovlp.resize(norb*norb) ;
 
-           string path_overlap = "overlap.txt";
+//           string path_overlap = "overlap.txt";
 
            ifstream ifs(path_overlap);
            string line;

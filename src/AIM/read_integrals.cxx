@@ -13,7 +13,7 @@ namespace aim
 
 template <typename U>
 ReadInts<U>::ReadInts(const string& name, input::Config& config)
-: Task(name, config)
+: Task(name, config), path_overlap(config.get<string>("filename_overlap"))
 {
     vector<Requirement> reqs;
     reqs.emplace_back("aim","aim"); 
@@ -41,14 +41,15 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     vector<vector<double>> Dalpha(norb,vector<double>(norb));
     vector<vector<double>> Dbeta(norb,vector<double>(norb));
 
-    if (arena.rank == 0)
-    {
+    if (arena.rank == 0){
      read_1e_integrals(norb) ; 
+     read_overlap(norb) ; 
     } else
 
     {
            int_a.resize(norb*norb) ;
            int_b.resize(norb*norb) ;
+           ovlp.resize(norb*norb) ;
      } 
 
     read_coeff() ;	
@@ -97,9 +98,11 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
     vector<tkv_pair<U>> fbpairs;
     vector<tkv_pair<U>> ov_pairs;
 
-    for (int i = 0;i < norb;i++)
-     for (int j = 0;j < norb;j++)
-        ov_pairs.emplace_back(i*norb+i, ovlp[i*norb+j]);
+    for (int i = 0;i < norb;i++){
+     for (int j = 0;j < norb;j++){
+        ov_pairs.emplace_back(i*norb+j, ovlp[i*norb+j]);
+     }
+    }
 
    if (coeff_exists) 
    {
@@ -148,5 +151,11 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
 }
 }
 
+static const char* spec = R"(
+    filename_overlap?
+        string overlap.txt,
+
+)";
+
 INSTANTIATE_SPECIALIZATIONS(aquarius::aim::ReadInts);
-REGISTER_TASK(aquarius::aim::ReadInts<double>,"read_aim_integrals");
+REGISTER_TASK(CONCAT(aquarius::aim::ReadInts<double>), "read_aim_integrals",spec);
