@@ -252,7 +252,7 @@ class CCSDSIGMA: public Task
 
     if (nr_impurities == 0){
 
-       U thrs = 1.e-8 ;
+       U thrs = 1.e-5 ;
        U mu = 0. ;
 
          energy = 0. ; 
@@ -261,6 +261,7 @@ class CCSDSIGMA: public Task
          bisection(arena, nspin, mu, fock, sigma[nspin], gf_final, density) ;
 
          for (int omega = 0; omega < nmax ; omega++){
+          sigma[nspin][omega].clear() ;
           calculate_sigma(mu, omegas[nspin][omega], fock, gf_final[omega], sigma[nspin][omega]) ;
           energy += E2b(sigma[nspin][omega], gf_final[omega]) ; 
          }
@@ -498,7 +499,7 @@ class CCSDSIGMA: public Task
    void bisection(const Arena &arena, int nspin, U mu, vector<U> &fock, vector<vector<CU>> &sigma, vector<vector<CU>> &gf, vector<U> &density) 
    {
     int nelec ;
-    U threshold = 1.e-8 ;
+    U threshold = 1.e-5 ;
     U mu_min=-3., mu_max=3.;
     U mu_lower, mu_upper ;
 
@@ -718,7 +719,7 @@ class CCSDSIGMA: public Task
       {
         omega = {0.0,(2.0*w+1)*M_PI/beta} ;      
        for (int p = 0; p < norb ;p++){
-         e2b_hf +=  2.0*(-(1.0/omega).imag()*(sigma_xx[p*norb+p]/omega).imag()) ; 
+         e2b_hf +=  1.0*(-(1.0/omega).imag()*(sigma_xx[p*norb+p]/omega).imag()) ; 
        }
       }
 
