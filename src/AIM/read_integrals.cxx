@@ -13,7 +13,7 @@ namespace aim
 
 template <typename U>
 ReadInts<U>::ReadInts(const string& name, input::Config& config)
-: Task(name, config), path_overlap(config.get<string>("filename_overlap"))
+: Task(name, config), path_overlap(config.get<string>("filename_overlap")), path_fock(config.get<string>("filename_fock"))
 {
     vector<Requirement> reqs;
     reqs.emplace_back("aim","aim"); 
@@ -86,8 +86,8 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
      }
     }
 
-    auto& Ha =  this->put("Ha", new SymmetryBlockedTensor<U>("Fa", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
-    auto& Hb =  this->put("Hb", new SymmetryBlockedTensor<U>("Fb", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
+    auto& Ha =  this->put("Ha", new SymmetryBlockedTensor<U>("Ha", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
+    auto& Hb =  this->put("Hb", new SymmetryBlockedTensor<U>("Hb", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
     auto& Da = this->put("Da", new SymmetryBlockedTensor<U>("Da", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
     auto& Db = this->put("Db", new SymmetryBlockedTensor<U>("Db", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
     auto& S  = this->put("S", new SymmetryBlockedTensor<U>("S", arena, PointGroup::C1(), 2, {{norb},{norb}}, {NS,NS}, true));
@@ -154,6 +154,8 @@ bool ReadInts<U>::run(task::TaskDAG& dag, const Arena& arena)
 static const char* spec = R"(
     filename_overlap?
         string overlap.txt,
+    filename_fock?
+        string fock_imp_0.txt
 
 )";
 
