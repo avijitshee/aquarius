@@ -208,7 +208,7 @@ void uhf_modelh<T>::iterate(const Arena& arena)
         for (int j = 0;j < norb;j++)
         {
             E_beta_sorted.push_back(make_pair(E_beta[i][j],i));
-            printf("orbital#:  %d energy: %10f %10f\n",j, E_alpha_sorted[j].first, E_beta_sorted[j].first);
+//            printf("orbital#:  %d energy: %10f %10f\n",j, E_alpha_sorted[j].first, E_beta_sorted[j].first);
         }
     }
 

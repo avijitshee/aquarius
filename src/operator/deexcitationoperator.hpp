@@ -204,7 +204,7 @@ struct is_deexcitationoperator<tensor::ScaledTensor<const DeexcitationOperator<T
 
 template <typename T, typename U>
 auto operator*(const T& t1, const U& t2) ->
-    std::enable_if_t<detail::is_deexcitationoperator<T>::value &&
+    enable_if_t<detail::is_deexcitationoperator<T>::value &&
                 detail::is_excitationoperator<U>::value,
                 typename detail::is_deexcitationoperator<T>::type>
 {
@@ -213,7 +213,7 @@ auto operator*(const T& t1, const U& t2) ->
 
 template <typename T, typename U>
 auto operator*(const T& t1, const U& t2) ->
-    std::enable_if_t<detail::is_excitationoperator<T>::value &&
+    enable_if_t<detail::is_excitationoperator<T>::value &&
                 detail::is_deexcitationoperator<U>::value,
                 typename detail::is_excitationoperator<T>::type>
 {

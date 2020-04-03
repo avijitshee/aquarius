@@ -1,6 +1,5 @@
 #include "pyscf_import.hpp"
 #include "util/global.hpp"
-#include <mkl_cblas.h>
 
 using namespace aquarius::input;
 using namespace aquarius::tensor;
@@ -655,7 +654,7 @@ void pyscf_import<T>::buildFock_dalton()
   
        if (coeff_exists){ densb[i] = densa[i] ; 
 
-          energy_firstiter  += 0.5*(cblas_ddot(norb[i]*norb[i], focka[i].data(), 1, densa[i].data(), 1) +cblas_ddot(norb[i]*norb[i], fockb[i].data(), 1, densb[i].data(), 1)) ;
+          energy_firstiter  += 0.5*(c_ddot(norb[i]*norb[i], focka[i].data(), 1, densa[i].data(), 1) +c_ddot(norb[i]*norb[i], fockb[i].data(), 1, densb[i].data(), 1)) ;
         } 
 
         densab[i] = densa[i];
@@ -838,7 +837,7 @@ void pyscf_import<T>::buildFock_dalton()
 
             Fb.writeRemoteData(irreps, pairs);
 
-            energy_firstiter  += 0.5*(cblas_ddot(norb[i]*norb[i], focka[i].data(), 1, densa[i].data(), 1) +cblas_ddot(norb[i]*norb[i], fockb[i].data(), 1, densb[i].data(), 1)) ;
+            energy_firstiter  += 0.5*(c_ddot(norb[i]*norb[i], focka[i].data(), 1, densa[i].data(), 1) +c_ddot(norb[i]*norb[i], fockb[i].data(), 1, densb[i].data(), 1)) ;
 
         }
         else

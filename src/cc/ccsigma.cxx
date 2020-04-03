@@ -8,7 +8,6 @@
 #include "hubbard/uhf_modelH.hpp"
 #include "AIM/uhf_modelH.hpp"
 #include "scf/uhf.hpp"
-#include <mkl_cblas.h>
 
 using namespace aquarius::hubbard;
 using namespace aquarius::tensor;
@@ -215,6 +214,10 @@ class CCSDSIGMA: public Task
         bisection_HF(mu_HF, nspin, fock) ; 
     }
 
+
+      std::ofstream gomega;
+      gomega.open ("gf_total.txt", ofstream::out|std::ios::app);
+
       for (int omega = 0; omega < omegas[nspin].size() ;omega++){
       
        vector<CU> gf_imp(nr_impurities*nr_impurities,{0.,0.}) ;
@@ -237,16 +240,14 @@ class CCSDSIGMA: public Task
        if (arena.rank == 0){
         for (int i = 0; i < nr_impurities ; i++){
          for (int j = 0; j < nr_impurities ; j++){
-	      std::ofstream gomega;
-	      gomega.open ("gf_total.txt", ofstream::out|std::ios::app);
 	      gomega << setprecision(12) << gf_imp[i*nr_impurities+j] << std::endl ; 
-	      gomega.close();
          }}
        }
 
       }
      } 
 
+      gomega.close();
    /* bisection starts here
     */
 
@@ -783,13 +784,14 @@ class CCSDSIGMA: public Task
 
         vector<U> buf(norb*nr_impurities,0.) ;
 
-        cblas_dgemm(CblasRowMajor,CblasTrans, CblasNoTrans, nr_impurities, norb, norb, 1.0, c_small.data(), nr_impurities, g_mo_real.data(), norb, 0.0, buf.data(), norb);
-        cblas_dgemm(CblasRowMajor,CblasNoTrans, CblasNoTrans, nr_impurities, nr_impurities, norb, 1.0, buf.data(), norb, c_small.data(), nr_impurities, 1.0, g_imp_real.data(), nr_impurities);
+        c_dgemm('T', 'N', nr_impurities, norb, norb, 1.0, c_small.data(), norb, g_mo_real.data(), norb, 0.0, buf.data(), nr_impurities);
+        c_dgemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), norb, c_small.data(), norb, 1.0, g_imp_real.data(), nr_impurities);
 
         buf.clear() ; 
 
-        cblas_dgemm(CblasRowMajor,CblasTrans, CblasNoTrans, nr_impurities, norb, norb, 1.0, c_small.data(), nr_impurities, g_mo_imag.data(), norb, 0.0, buf.data(), norb);
-        cblas_dgemm(CblasRowMajor,CblasNoTrans, CblasNoTrans, nr_impurities, nr_impurities, norb, 1.0, buf.data(), norb, c_small.data(), nr_impurities, 1.0, g_imp_imag.data(), nr_impurities);
+        c_dgemm('T', 'N', nr_impurities, norb, norb, 1.0, c_small.data(), norb, g_mo_imag.data(), norb, 0.0, buf.data(), nr_impurities);
+        c_dgemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), norb, c_small.data(), norb, 1.0, g_imp_imag.data(), nr_impurities);
+
 
     /*combine real and imaginary part to produce total complex matrix
      */ 
@@ -808,8 +810,8 @@ class CCSDSIGMA: public Task
     {
          vector<U> buf(norb*norb,0.) ;
 
-          cblas_dgemm(CblasRowMajor,CblasTrans, CblasNoTrans, norb, norb, norb, 1.0, c_mo.data(), norb, g_mo.data(), norb, 0.0, buf.data(), norb);
-          cblas_dgemm(CblasRowMajor,CblasNoTrans, CblasNoTrans, norb, norb, norb, 1.0, buf.data(), norb, c_mo.data(), norb, 1.0, g_imp.data(), norb);
+          c_dgemm('T', 'N', norb, norb, norb, 1.0, c_mo.data(), norb, g_mo.data(), norb, 0.0, buf.data(), norb);
+          c_dgemm('N', 'N', norb, norb, norb, 1.0, buf.data(), norb, c_mo.data(), norb, 1.0, g_imp.data(), norb);
 
        /* feed in fortran order
         */
