@@ -167,6 +167,12 @@ class CCSDSIGMA: public Task
        if (gfile) remove("gf_total.txt");
       }
 
+
+      if (arena.rank == 0){
+       std::ifstream gmofile("gf_mo.txt");
+       if (gmofile) remove("gf_mo.txt");
+      }
+
        vector<vector<vector<CU>>> sigma(maxspin,vector<vector<CU>>(nmax,vector<CU>(norb*norb, {0.,0.}))) ;
        U energy = 0. ; 
  
@@ -218,6 +224,11 @@ class CCSDSIGMA: public Task
       std::ofstream gomega;
       gomega.open ("gf_total.txt", ofstream::out|std::ios::app);
 
+
+      std::ofstream gmo;
+      gmo.open ("gf_mo.txt", ofstream::out|std::ios::app);
+
+
       for (int omega = 0; omega < omegas[nspin].size() ;omega++){
       
        vector<CU> gf_imp(nr_impurities*nr_impurities,{0.,0.}) ;
@@ -244,10 +255,18 @@ class CCSDSIGMA: public Task
          }}
        }
 
+       if (arena.rank == 0){
+        for (int i = 0; i < norb ; i++){
+         for (int j = 0; j < norb ; j++){
+             gmo << setprecision(12) << gf_tmp[i*norb+j].real() << " " << gf_tmp[i*norb+j].imag() << std::endl ;
+         }}
+       }
+
       }
      } 
 
       gomega.close();
+      gmo.close() ;
    /* bisection starts here
     */
 
