@@ -788,9 +788,17 @@ class CCSDSIGMA: public Task
 
    /*  Extract in Row major a section of c_mo array
     */
+//     for (int i = 0; i < norb ; i++){
+//       for (int j = 0; j < nr_impurities ; j++){
+//          c_small [i*nr_impurities+j] = c_mo[i*norb+j] ; 
+//       } 
+//     }
+
+   /* Extract in colum major a section of c_mo array
+    */
        for (int i = 0; i < norb ; i++){
          for (int j = 0; j < nr_impurities ; j++){
-            c_small [i*nr_impurities+j] = c_mo[i*norb+j] ; 
+            c_small [j*norb+i] = c_mo[i*norb+j] ; 
          } 
        }
 
@@ -804,13 +812,12 @@ class CCSDSIGMA: public Task
         vector<U> buf(norb*nr_impurities,0.) ;
 
         c_dgemm('T', 'N', nr_impurities, norb, norb, 1.0, c_small.data(), norb, g_mo_real.data(), norb, 0.0, buf.data(), nr_impurities);
-        c_dgemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), norb, c_small.data(), norb, 1.0, g_imp_real.data(), nr_impurities);
+        c_dgemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), nr_impurities, c_small.data(), norb, 1.0, g_imp_real.data(), nr_impurities);
 
         buf.clear() ; 
 
         c_dgemm('T', 'N', nr_impurities, norb, norb, 1.0, c_small.data(), norb, g_mo_imag.data(), norb, 0.0, buf.data(), nr_impurities);
-        c_dgemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), norb, c_small.data(), norb, 1.0, g_imp_imag.data(), nr_impurities);
-
+        c_dgemm('N', 'N', nr_impurities, nr_impurities, norb, 1.0, buf.data(), nr_impurities, c_small.data(), norb, 1.0, g_imp_imag.data(), nr_impurities);
 
     /*combine real and imaginary part to produce total complex matrix
      */ 
@@ -819,7 +826,7 @@ class CCSDSIGMA: public Task
        {
          for (int j = 0; j < nr_impurities ; j++)
          {
-            g_imp [i*nr_impurities+j] = {g_imp_real[i*nr_impurities+j],g_imp_imag[i*nr_impurities+j]} ; 
+          g_imp [i*nr_impurities+j] = {g_imp_real[i*nr_impurities+j],g_imp_imag[i*nr_impurities+j]} ; 
          } 
        }
 
