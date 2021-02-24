@@ -107,7 +107,6 @@ class CCSDSIGMA: public Task
             }
            }
 
-
             if (gf_string == "symmetrized") gf_type = 1 ;
             if (gf_string == "nonsymmetrized") gf_type = 2 ;
          } 
@@ -211,7 +210,6 @@ class CCSDSIGMA: public Task
           fock[j*norb+i] = fock[i*norb+j] ;
          }
         } 
-
 
     U mu_HF = 0. ;
 

@@ -66,7 +66,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
             int orbleft ;
             int orbright ;
 
-//            int maxspin = (nI == ni) ? 1 : 2 ;
+//          int maxspin = (nI == ni) ? 1 : 2 ;
             int maxspin =  2 ;
 
             auto& T = this->template get<ExcitationOperator  <U,2>>("T");
@@ -103,8 +103,12 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
               gamma_ip[nspin].resize(element_end-element_start+1) ;
             }
 
-             vector<int> array1((nI+nA)*((nI+nA)+1)/2);
-             vector<int> array2((nI+nA)*((nI+nA)+1)/2);
+             int upper_triangle = int(((nI+nA)*((nI+nA)+1))/2) ;
+
+             cout << "upper triangular dimension " << upper_triangle << endl ;
+
+             vector<int> array1(upper_triangle);
+             vector<int> array2(upper_triangle);
              vector< pair <int,int> > get_index ; 
 
              int x = 0 ; 
@@ -116,7 +120,7 @@ class CCSDIPGF_LANCZOS : public Iterative<U>
                 }
              }
 
-             for (int i = 0; i < (nI+nA)*((nI+nA)+1)/2 ; i++){   
+             for (int i = 0; i < upper_triangle ; i++){   
                  get_index.push_back( make_pair(array1[i],array2[i]) );
              }
 

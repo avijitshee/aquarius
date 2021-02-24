@@ -32,7 +32,8 @@ class CCSDEAGF : public Iterative<complex_type_t<U>>
         CU value ;
         int orbstart;
         int orbend;
-        string orb_range ;
+        int element_start ;
+        int element_end ;
 
     public:
         CCSDEAGF(const string& name, Config& config)
@@ -44,14 +45,16 @@ class CCSDEAGF : public Iterative<complex_type_t<U>>
             reqs.emplace_back("ccsd.Hbar", "Hbar");
             this->addProduct("ccsd.eagf", "gf_ea", reqs);
 
-            orbital = config.get<int>("orbital");
+
             double from = config.get<double>("omega_min");
             double to = config.get<double>("omega_max");
             int n = config.get<double>("npoint");
             double eta = config.get<double>("eta");
+            element_start = config.get<int>("element_start");
+            element_end = config.get<int>("element_end");
             double beta = config.get<double>("beta");
             string grid_type = config.get<string>("grid");
-            orb_range = config.get<string>("orbital_range");
+
 
             double delta = (to-from)/max(1,n-1);
             for (int i = 0;i < n;i++)
@@ -59,6 +62,18 @@ class CCSDEAGF : public Iterative<complex_type_t<U>>
              if (grid_type == "real") omegas.emplace_back(from+delta*i, eta);
              if (grid_type == "imaginary") omegas.emplace_back(0.,(2.0*i+1)*M_PI/beta);
             }
+
+            ifstream ifsa("wlist_sub.txt");
+            if (ifsa){
+            omegas.clear() ; 
+            string line;
+            while (getline(ifsa, line)){
+             U val;
+             istringstream(line) >> val;
+             omegas.emplace_back(0.,val);
+            }
+           }
+
         }
 
         bool run(TaskDAG& dag, const Arena& arena)
@@ -76,12 +91,13 @@ class CCSDEAGF : public Iterative<complex_type_t<U>>
             int nA = vrt.nalpha[0];
             int na = vrt.nbeta[0];
 
-            int maxspin = (nI == ni) ? 1 : 2 ;
+//            int maxspin = (nI == ni) ? 1 : 2 ;
+            int maxspin = 2 ;
 
             auto& T = this->template get<ExcitationOperator  <U,2>>("T");
             auto& L = this->template get<DeexcitationOperator<U,2>>("L");
 
-            auto& gf_ea = this-> put("gf_ea", new vector<vector<vector<vector<CU>>>>) ;
+            auto& gf_ea = this-> put("gf_ea", new vector<CU>) ;
             
             SpinorbitalTensor<U> Dab("D(ab)", arena, group, {vrt,occ}, {1,0}, {1,0});
             SpinorbitalTensor<U> Gieab("G(am,ef)", arena, group, {vrt,occ}, {1,1}, {2,0});
@@ -91,60 +107,36 @@ class CCSDEAGF : public Iterative<complex_type_t<U>>
 
             Gieab["amef"]  = -L(2)["nmef"]*T(1)[  "an"];
 
-          if (orb_range == "full") 
-           { orbstart = 0 ;
-             orbend = nI + nA ;  
-             gf_ea.resize(maxspin);
 
-            for (int nspin = 0;nspin < maxspin;nspin++)
-             {
-              gf_ea[nspin].resize(omegas.size());
-             }  
+           vector<int> array1(pow((nI+nA),2));
+           vector<int> array2(pow((nI+nA),2));
+           vector< pair <int,int> > get_index ; 
 
-            for (int nspin = 0;nspin < maxspin;nspin++)
-             {
-              for (int i = 0;i < omegas.size();i++)
-               {
-                gf_ea[nspin][i].resize(orbend);
-               }
-             }
-             for (int nspin = 0;nspin < maxspin;nspin++)
-             for (int i = 0;i < omegas.size();i++)
-             for (int j = 0;j < orbend;j++)
-             {
-               gf_ea[nspin][i][j].resize(orbend);
-             }
-           } 
-
-           if (orb_range == "diagonal") 
-           { orbstart = orbital-1 ;
-             orbend = orbital;  
-             gf_ea.resize(maxspin);
-            for (int nspin = 0;nspin < maxspin;nspin++)
-             {
-              gf_ea[nspin].resize(omegas.size());
-             }  
-            for (int nspin = 0;nspin < maxspin;nspin++)
-             {
-              for (int i = 0;i < omegas.size();i++)
-               {
-                gf_ea[nspin][i].resize(1);
-               }
-             }
-             for (int nspin = 0;nspin < maxspin;nspin++)
-             for (int i = 0;i < omegas.size();i++)
-             for (int j = 0;j < 1;j++)
-             {
-               gf_ea[nspin][i][j].resize(1);
+           int x = 0 ; 
+           for (int orbleft = 0; orbleft < (nI+nA) ; orbleft++){   
+             for (int orbright = 0; orbright < (nI+nA) ; orbright++){   
+                array1[x] = orbleft ;
+                array2[x] = orbright ;
+                x += 1 ;
              }
            }
 
-        for (int nspin = 0; nspin < maxspin ; nspin++)   
-         {
-          for (int orbleft = orbstart; orbleft < orbend ; orbleft++)   
-          {
-           for (int orbright = orbstart; orbright < orbend ; orbright++)   
-            {
+           for (int i = 0; i < (nI+nA)*(nI+nA) ; i++){   
+              get_index.push_back( make_pair(array1[i],array2[i]) );
+           }
+
+
+       int uppertriangle ;
+       int orbleft ;
+       int orbright ;
+
+       for (int nspin = 0; nspin < maxspin ; nspin++){
+           uppertriangle = 0 ;
+        for (int orbs = element_start; orbs < element_end ; orbs++){   
+
+           orbleft = get_index[orbs].first ;
+           orbright = get_index[orbs].second ;
+
 
              printf("Computing Green's function element:  %d %d\n", orbleft, orbright ) ;
 
@@ -198,7 +190,7 @@ class CCSDEAGF : public Iterative<complex_type_t<U>>
             auto& Zi = this->puttmp("Zi", new ExcitationOperator  <U,2,1>("Zi", arena, occ, vrt, isalpha_right ? 1 : -1));
 
             auto& b  = this->puttmp("b",  new ExcitationOperator  <U,2,1>("b",  arena, occ, vrt, isalpha_right ? 1 : -1));
-            auto& e  = this->puttmp("e",  new DeexcitationOperator<U,2,1>("e",  arena, occ, vrt, isalpha_right ? -1 : 1));
+            auto& e  = this->puttmp("e",  new DeexcitationOperator<U,2,1>("e",  arena, occ, vrt, isalpha_left ? -1 : 1));
 
             auto& XMI = this->puttmp("XMI", new SpinorbitalTensor<U>("X(mi)", arena, group, {vrt,occ}, {0,1}, {0,0}, isalpha_left ? 1 : -1));
 
@@ -286,12 +278,34 @@ class CCSDEAGF : public Iterative<complex_type_t<U>>
                 Ri /= norm;
 
                 Iterative<CU>::run(dag, arena);
-                if (orb_range == "full") gf_ea[nspin][omega_counter][orbleft][orbright] = value ;
-                if (orb_range == "diagonal") gf_ea[nspin][omega_counter][0][0] = value ;
+
+                gf_ea.emplace_back(value) ;
+
               omega_counter += 1 ;
             }
            }
           }
+
+         if (arena.rank == 0)
+         {
+             int counter = 0 ;
+             for (int nspin = 0 ; nspin < maxspin ; nspin++){
+             stringstream stream1;
+             stream1 << "gf_ea_"<<nspin<<"_"<<element_start<<"_"<<element_end<< ".txt";
+             string fileName1 = stream1.str();
+             std::ofstream gffile;
+             gffile.open (fileName1, ofstream::out);
+
+
+            for (int j=element_start ; j < element_end ; j++){
+             for (int i=0 ; i < omegas.size() ; i++){
+//                 gffile << nspin << " " << i << " " << j << " " << setprecision(12) <<  gf_ea[nspin][i][j-element_start] << endl ;
+                   gffile << nspin << " " << j << " " << i << " " << setprecision(12) <<  gf_ea[counter].real() << " " << gf_ea[counter].imag() << endl ;
+                   counter += 1 ;
+             }}  
+
+             gffile.close();
+             }
          }
 
             return true;
@@ -382,17 +396,17 @@ class CCSDEAGF : public Iterative<complex_type_t<U>>
 
 static const char* spec = R"(
 
-orbital int,
+element_start ?
+   int 0,
+element_end int,
 npoint int,
 omega_min double,
 omega_max double,
 eta double,
-grid?
-  enum{ real, imaginary },
-orbital_range?
-  enum{ diagonal, full},
 beta?
    double 100.0 , 
+grid?
+  enum{ real, imaginary },
 convergence?
     double 1e-9,
 max_iterations?
