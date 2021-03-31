@@ -24,7 +24,7 @@ namespace cc
 {
 
 template <typename U>
-class CCSDEAGF_LANCZOS : public Iterative<U>
+class CCSDTEAGF_LANCZOS_D_T : public Iterative<U>
 {
     protected:
         typedef U X ; 
@@ -34,14 +34,14 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
         int element_end ;
 
     public:
-        CCSDEAGF_LANCZOS(const string& name, Config& config)
+        CCSDTEAGF_LANCZOS_D_T(const string& name, Config& config)
         : Iterative<U>(name, config), lanczos_config(config.get("lanczos"))
         {
             vector<Requirement> reqs;
             reqs.emplace_back("ccsd.T", "T");
             reqs.emplace_back("ccsd.L", "L");
             reqs.emplace_back("ccsd.Hbar", "Hbar");
-            this->addProduct(Product("ccsd.eagf", "gf_ea", reqs));
+            this->addProduct(Product("ccsdt.eagf", "gf_ea", reqs));
 
             element_start = config.get<int>("element_start");
             element_end = config.get<int>("element_end");
@@ -173,15 +173,24 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
   /* vector LL means Left Lanczos and RL means Right Lanczos, in case you are wondering!  
    */
-            auto& RL = this->puttmp("RL", new ExcitationOperator  <U,2,1>("RL", arena, occ, vrt, isalpha_right ? 1 : -1));
-            auto& LL = this->puttmp("LL", new DeexcitationOperator  <U,2,1>("LL", arena, occ, vrt, isalpha_left ? -1 : 1));
-            auto& Z = this->puttmp("Z", new ExcitationOperator  <U,2,1>("Z", arena, occ, vrt, isalpha_right ? 1 : -1));
-            auto& Y = this->puttmp("Y", new DeexcitationOperator  <U,2,1>("Y", arena, occ, vrt, isalpha_left ? -1 : 1));
-            auto& b  = this->puttmp("b",  new ExcitationOperator  <U,2,1>("b",  arena, occ, vrt, isalpha_right ? 1 : -1));
-            auto& e  = this->puttmp("e",  new DeexcitationOperator<U,2,1>("e",  arena, occ, vrt, isalpha_left ? -1 : 1));
+            auto& RL = this->puttmp("RL", new ExcitationOperator  <U,3,2>("RL", arena, occ, vrt, isalpha_right ? 1 : -1));
+            auto& LL = this->puttmp("LL", new DeexcitationOperator  <U,3,2>("LL", arena, occ, vrt, isalpha_left ? -1 : 1));
+            auto& Z = this->puttmp("Z", new ExcitationOperator  <U,3,2>("Z", arena, occ, vrt, isalpha_right ? 1 : -1));
+            auto& Y = this->puttmp("Y", new DeexcitationOperator  <U,3,2>("Y", arena, occ, vrt, isalpha_left ? -1 : 1));
+            auto& b  = this->puttmp("b",  new ExcitationOperator  <U,3,2>("b",  arena, occ, vrt, isalpha_right ? 1 : -1));
+            auto& e  = this->puttmp("e",  new DeexcitationOperator<U,3,2>("e",  arena, occ, vrt, isalpha_left ? -1 : 1));
 
             auto& XMI = this->puttmp("XMI", new SpinorbitalTensor<U>("X(mi)", arena, group, {vrt,occ}, {0,1}, {0,0}, isalpha_left ? 1 : -1));
+
+            auto& XMCI = this->puttmp("XMCI", new SpinorbitalTensor<U>("X(mc,i)", arena, group, {vrt,occ}, {1,1}, {0,1}, isalpha_right ? -1 : 1));
+            auto& XACE = this->puttmp("XACE", new SpinorbitalTensor<U>("X(ac,e)", arena, group, {vrt,occ}, {2,0}, {1,0}, isalpha_right ? -1 : 1));
+
             auto& GIM = this->puttmp("GIM", new SpinorbitalTensor<U>("G(im)", arena, group, {vrt,occ}, {0,0}, {0,1}, isalpha_right ? -1 : 1));
+
+            auto& XIMC = this->puttmp("XIMC", new SpinorbitalTensor<U>("X(i,mc)", arena, group, {vrt,occ}, {0,1}, {1,1}, isalpha_left ? 1 : -1));
+            auto& XEAC = this->puttmp("XEAC", new SpinorbitalTensor<U>("X(e,ac)", arena, group, {vrt,occ}, {1,0}, {2,0}, isalpha_left ? 1 : -1));
+            auto& XEMO = this->puttmp("XEMO", new SpinorbitalTensor<U>("X(e,mo)", arena, group, {vrt,occ}, {1,0}, {0,2}, isalpha_right ? -1 : 1));
+
             auto& alpha = this-> puttmp("alpha", new unique_vector<U>()) ;
             auto& beta  = this-> puttmp("beta", new unique_vector<U>()) ;
             auto& gamma = this-> puttmp("gamma", new unique_vector<U>());
@@ -253,6 +262,8 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                 e(1)[  "a"]  +=   Dab[  "ea"]*apt["e"];
                 e(2)["iab"]  =  L(1)[  "ia"]*apt["b"];
                 e(2)["iab"]  += Gieab["eiba"]*apt["e"];
+                e(3)["ijabc"] =  L(2)[  "ijab"]*apt["c"];
+
                 e(1)[  "a"]  -= L(1)[  "ka"]*ap["k"];  
                 e(2)["iab"]  -= L(2)["ikab"]*ap["k"]; 
 
@@ -280,6 +291,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                 e(1)[  "a"]  +=   Dab[  "ea"]*ap["e"];
                 e(2)["iab"]  +=  L(1)[  "ia"]*ap["b"];
                 e(2)["iab"]  += Gieab["eiba"]*ap["e"];
+                e(3)["ijabc"] =  L(2)[  "ijab"]*ap["c"];
             }
             else
             {
@@ -298,6 +310,7 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                 e(1)[  "a"]  +=   Dab[  "ea"]*apt["e"];
                 e(2)["iab"]  =  L(1)[  "ia"]*apt["b"];
                 e(2)["iab"]  += Gieab["eiba"]*apt["e"];
+                e(3)["ijabc"]  =  L(2)[  "ijab"]*apt["c"];
 
                if (orbright != orbleft)
               {
@@ -306,11 +319,10 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                 e(1)[  "a"]  +=   Dab[  "ea"]*ap["e"];
                 e(2)["iab"]  +=  L(1)[  "ia"]*ap["b"];
                 e(2)["iab"]  += Gieab["eiba"]*ap["e"];
+                e(3)["ijabc"] +=  L(2)[  "ijab"]*ap["c"];
               }
             }
 
-              auto& D = this->puttmp("D", new Denominator<U>(H));
-          
               int number_of_vectors = nA*nA*nI + nA ; 
               this->puttmp("lanczos", new Lanczos<U,X>(lanczos_config, number_of_vectors));
 
@@ -420,17 +432,22 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
             auto& T = this->template get<ExcitationOperator<U,2>>("T");
 
             auto& XMI = this->template gettmp<SpinorbitalTensor<U>>("XMI");
-            auto& GIM = this->template gettmp<SpinorbitalTensor<U>>("GIM");
+            auto& XMCI = this->template gettmp<SpinorbitalTensor<U>>("XMCI");
+            auto& XACE = this->template gettmp<SpinorbitalTensor<U>>("XACE");
 
-            auto& D = this->template gettmp<Denominator<U>>("D");
+            auto& GIM = this->template gettmp<SpinorbitalTensor<U>>("GIM");
+            auto& XIMC = this->template gettmp<SpinorbitalTensor<U>>("XIMC");
+            auto& XEAC = this->template gettmp<SpinorbitalTensor<U>>("XEAC");
+            auto& XEMO = this->template gettmp<SpinorbitalTensor<U>>("XEMO");
+
             auto& lanczos = this->template gettmp<Lanczos<U,X>>("lanczos");
 
-            auto& RL = this->template gettmp< ExcitationOperator<U,2,1>>("RL");
-            auto& LL = this->template gettmp< DeexcitationOperator<U,2,1>>("LL");
-            auto& Z  = this->template gettmp<  ExcitationOperator<U,2,1>>("Z");
-            auto& Y  = this->template gettmp<  DeexcitationOperator<U,2,1>>("Y");
-            auto& b  = this->template gettmp<  ExcitationOperator<U,2,1>>("b");
-            auto& e  = this->template gettmp<DeexcitationOperator<U,2,1>>("e");
+            auto& RL = this->template gettmp< ExcitationOperator<U,3,2>>("RL");
+            auto& LL = this->template gettmp< DeexcitationOperator<U,3,2>>("LL");
+            auto& Z  = this->template gettmp<  ExcitationOperator<U,3,2>>("Z");
+            auto& Y  = this->template gettmp<  DeexcitationOperator<U,3,2>>("Y");
+            auto& b  = this->template gettmp<  ExcitationOperator<U,3,2>>("b");
+            auto& e  = this->template gettmp<DeexcitationOperator<U,3,2>>("e");
 
             auto& alpha = this->template gettmp<unique_vector<U>> ("alpha");
             auto& beta  = this->template gettmp<unique_vector<U>> ("beta");
@@ -438,9 +455,19 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
 
                 XMI[  "m"] = -0.5*WMNEF["mnef"]*RL(2)["efn"];
 
+                XMCI[  "mci"]  =      WAMEI["cmei"]*RL(1)[     "e"];
+                XMCI[  "mci"] +=      WMNEJ["nmei"]*RL(2)[   "ecn"];
+                XMCI[  "mci"] +=  0.5*WMNEF["mnef"]*RL(3)[ "efcin"];
+                XMCI[  "mci"] +=  0.5*WAMEF["cmef"]*RL(2)[  "efi"];
+
+                XACE[  "ace"]  =      WABEF["acef"]*RL(1)[     "f"];
+                XACE[  "ace"] +=      WAMEF["amef"]*RL(2)[   "fcm"];
+                XACE[  "ace"] -=  0.5*WMNEF["mnef"]*RL(3)[ "afcmn"];
+
                 Z(1)[  "a"]  =       FAE[  "ae"]*RL(1)[  "e"];
                 Z(1)[  "a"] -=       FME[  "me"]*RL(2)["aem"];
                 Z(1)[  "a"] -= 0.5*WAMEF["amef"]*RL(2)["efm"];
+                Z(1)[  "a"] += 0.25*WMNEF["mnef"]*RL(3)[ "efamn"];
 
                 Z(2)["abi"]   =     WABEJ["baei"]*RL(1)[  "e"];
                 Z(2)["abi"]  +=       FAE[  "ae"]*RL(2)["ebi"];
@@ -448,6 +475,20 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                 Z(2)["abi"]  -=       XMI[  "m"]*T(2)["abim"];
                 Z(2)["abi"]  += 0.5*WABEF["abef"]*RL(2)["efi"];
                 Z(2)["abi"]  -=     WAMEI["amei"]*RL(2)["ebm"];
+                Z(2)["abi"]  +=        FME[  "me"]*RL(3)[ "eabmi"];
+                Z(2)["abi"]  +=  0.5*WAMEF["amef"]*RL(3)[ "efbim"];
+                Z(2)["abi"]  -=  0.5*WMNEJ["mnei"]*RL(3)[ "eabmn"];
+
+                Z(3)["abcij"]  =      WABEJ["abej"]*RL(2)[   "eci"];
+                Z(3)["abcij"] -=      WAMIJ["amij"]*RL(2)[   "bcm"];
+                Z(3)["abcij"] +=        FAE[  "ae"]*RL(3)[ "ebcij"];
+                Z(3)["abcij"] -=        FMI[  "mi"]*RL(3)[ "abcmj"];
+                Z(3)["abcij"] -=      WAMEI["amei"]*RL(3)[ "ebcmj"];
+                Z(3)["abcij"] +=  0.5*WABEF["abef"]*RL(3)[ "efcij"];
+                Z(3)["abcij"] +=  0.5*WMNIJ["mnij"]*RL(3)[ "abcmn"];
+                Z(3)["abcij"] -=       XMCI[ "mci"]*T(2)[  "abmj"];
+                Z(3)["abcij"] -=       XACE[ "ace"]*T(2)[  "beji"];
+
 
   /*Left hand matrix-vector product : Q^T Hbar
    *We will use Y array for the left hand residual..   
@@ -464,6 +505,43 @@ class CCSDEAGF_LANCZOS : public Iterative<U>
                 Y(2)["iab"] += 0.5*WABEF["efab"]*LL(2)["ief"];
                 Y(2)["iab"] -=     WAMEI["eibm"]*LL(2)["mae"];
                 Y(2)["iab"] -=     WMNEF["miba"]* GIM[  "m"];
+
+            /* new intermediates for SDT
+             */
+
+                XEAC[  "eac"]  =        -0.5*T(2)[  "efmj"]* LL(3)["mjafc"];
+                XIMC[  "imc"]  =        +0.5*T(2)[  "efmn"]* LL(3)["inefc"];
+
+                XEMO[    "amo"] =     -T(2)[  "afno"]*XIMC[  "nmf"];
+
+
+                Y(1)[  "a"] -=  WAMEI["eman"]*XIMC["nme"]; //correct 
+                Y(1)[  "a"] -=  0.5*WABEF[  "efga"]*XEAC[  "gef"]; //correct
+
+                Y(1)[  "a"] -=  0.5*WMNEF[  "miea"]*XEMO[  "emi"]; //correct
+
+                Y(2)[  "iab"] -=     WAMEF[  "emba"]*XIMC[  "ime"]; //correct 
+                Y(2)[  "iab"] +=     WMNEJ["mian"]*XIMC[  "nmb"]; //correct
+
+                Y(2)[  "iab"] +=     WAMEF["fibe"]*XEAC[  "efa"]; //correct 
+
+                Y(2)[  "iab"] -=        0.5*WAMIJ[  "eimn"]* LL(3)["mneab"];
+                Y(2)[  "iab"] +=        0.5*WABEJ[  "efam"]* LL(3)["imefb"];
+
+                Y(3)["ijabc"]  =            WMNEF[  "ijab"]* LL(1)[    "c"];
+                Y(3)["ijabc"] +=              FME[    "ia"]* LL(2)[  "jbc"];
+                Y(3)["ijabc"] +=            WAMEF[  "ejab"]* LL(2)[  "iec"];
+                Y(3)["ijabc"] -=            WMNEJ[  "ijam"]* LL(2)[  "mbc"];
+
+                Y(3)["ijabc"] +=            WMNEF[  "ijeb"]*XEAC[  "eac"]; // done...
+                Y(3)["ijabc"] -=            WMNEF[  "mjab"]*XIMC[  "imc"]; // done.. 
+
+                Y(3)["ijabc"] +=              FAE[    "ea"]* LL(3)["ijebc"];
+                Y(3)["ijabc"] -=              FMI[    "im"]* LL(3)["mjabc"];
+                Y(3)["ijabc"] +=        0.5*WABEF[  "efab"]* LL(3)["ijefc"];
+                Y(3)["ijabc"] +=        0.5*WMNIJ[  "ijmn"]* LL(3)["mnabc"];
+                Y(3)["ijabc"] -=            WAMEI[  "eibm"]* LL(3)["mjaec"];
+
  
             lanczos.extrapolate_tridiagonal(RL, LL, Z, Y, alpha, beta, gamma);
 
@@ -495,5 +573,5 @@ lanczos?
 
 )";
 
-INSTANTIATE_SPECIALIZATIONS(aquarius::cc::CCSDEAGF_LANCZOS);
-REGISTER_TASK(aquarius::cc::CCSDEAGF_LANCZOS<double>, "ccsdeagf_lanczos",spec);
+INSTANTIATE_SPECIALIZATIONS(aquarius::cc::CCSDTEAGF_LANCZOS_D_T);
+REGISTER_TASK(aquarius::cc::CCSDTEAGF_LANCZOS_D_T<double>, "ccsdteagf_lanczos_d_t",spec);

@@ -38,6 +38,12 @@ class Lanczos : public task::Destructible
         unique_vector<DeexcitationOperator<V,1,2>> old_c_l;
         unique_vector<ExcitationOperator<T,2,1>> old_c_r_particle;
         unique_vector<DeexcitationOperator<V,2,1>> old_c_l_particle;
+        unique_vector<ExcitationOperator<T,2,3>> old_c_r_h_triples;
+        unique_vector<DeexcitationOperator<V,2,3>> old_c_l_h_triples;
+
+        unique_vector<ExcitationOperator<T,3,2>> old_c_r_p_triples;
+        unique_vector<DeexcitationOperator<V,3,2>> old_c_l_p_triples;
+
         vector<CU> b;
         marray<CU,2> e;
         int maxextrap, nextrap, nvec;
@@ -83,6 +89,31 @@ class Lanczos : public task::Destructible
 
         }
 
+        void addVectors(const op::ExcitationOperator  <T,2,3>& c_r, const op::DeexcitationOperator  <V,2,3>& c_l)
+        {
+            nextrap++;
+
+            old_c_r_h_triples.clear();
+            old_c_l_h_triples.clear();
+
+            old_c_r_h_triples.emplace_back(c_r);
+            old_c_l_h_triples.emplace_back(c_l);
+
+        }
+
+        void addVectors(const op::ExcitationOperator  <T,3,2>& c_r, const op::DeexcitationOperator  <V,3,2>& c_l)
+        {
+            nextrap++;
+
+            old_c_r_p_triples.clear();
+            old_c_l_p_triples.clear();
+
+            old_c_r_p_triples.emplace_back(c_r);
+            old_c_l_p_triples.emplace_back(c_l);
+
+        }
+
+
     public:
         Lanczos(const input::Config& config, const int nvec)
         {
@@ -90,7 +121,7 @@ class Lanczos : public task::Destructible
             reset(nvec);
         }
 
-        void extrapolate_tridiagonal(op::ExcitationOperator  <T,1,2>& c_r,op::DeexcitationOperator<V,1,2>& c_l,op::ExcitationOperator  <T,1,2>& hc_r, op::DeexcitationOperator<V,1,2>& hc_l, const op::Denominator<T>& D, unique_vector<T>& alpha, unique_vector<T>& beta, unique_vector<T>& gamma)
+        void extrapolate_tridiagonal(op::ExcitationOperator  <T,1,2>& c_r,op::DeexcitationOperator<V,1,2>& c_l,op::ExcitationOperator  <T,1,2>& hc_r, op::DeexcitationOperator<V,1,2>& hc_l, unique_vector<T>& alpha, unique_vector<T>& beta, unique_vector<T>& gamma)
         {
             using slice::all;
 
@@ -159,7 +190,148 @@ class Lanczos : public task::Destructible
 
         }
 
-        void extrapolate_tridiagonal(op::ExcitationOperator  <T,2,1>& c_r,op::DeexcitationOperator<V,2,1>& c_l,op::ExcitationOperator  <T,2,1>& hc_r, op::DeexcitationOperator<V,2,1>& hc_l, const op::Denominator<T>& D, unique_vector<T>& alpha, unique_vector<T>& beta, unique_vector<T>& gamma)
+        void extrapolate_tridiagonal(op::ExcitationOperator  <T,2,3>& c_r,op::DeexcitationOperator<V,2,3>& c_l,op::ExcitationOperator  <T,2,3>& hc_r, op::DeexcitationOperator<V,2,3>& hc_l, unique_vector<T>& alpha, unique_vector<T>& beta, unique_vector<T>& gamma)
+        {
+            using slice::all;
+
+            /* calculate alpha(i) = pT(i)hc_rq(i)
+             */ 
+
+             alpha.push_back(scalar(c_l*hc_r)) ;             
+
+             double temp ;
+
+             unique_vector<ExcitationOperator<T,2,3>> r;
+             unique_vector<DeexcitationOperator<V,2,3>> s;
+
+            /* calculate r = hc_r - gamma(i-1)q(i-1) - alpha(i)q(i)
+             */
+
+             r.clear() ;
+             s.clear() ;
+
+           if (nextrap > 0) {
+             r.emplace_back(hc_r) ;
+             r[0] -= alpha[nextrap]*c_r ;
+             r[0] -= gamma[nextrap-1]*old_c_r_h_triples[0] ;
+           }else{
+             r.emplace_back(hc_r) ;
+             r[0] -= alpha[nextrap]*c_r ;
+           }
+
+            /* calculate s = hc_l - beta(i-1)pT(i-1) - alpha(i)pT(i)
+             */
+
+            if (nextrap > 0) {
+             s.emplace_back(hc_l) ;
+             s[0] -= alpha[nextrap]*c_l ;
+             s[0] -= beta[nextrap-1]*old_c_l_h_triples[0] ;
+           }else{
+             s.emplace_back(hc_l) ;
+             s[0] -= alpha[nextrap]*c_l ;
+          }
+
+             temp = scalar(r[0]*s[0]) ; 
+
+             if (abs(temp) > 1.0e-10)
+             {
+               beta.emplace_back (sqrt(aquarius::abs(scalar(r[0]*s[0])))) ;
+             }else
+             {
+               beta.emplace_back (0.0) ;
+             }
+
+             if (beta[nextrap] > 1.0e-10)
+             {
+              gamma.emplace_back (temp/beta[nextrap])  ; 
+             }else
+             {
+              gamma.emplace_back(0.) ; 
+             }
+
+             addVectors(c_r, c_l);
+
+             if (beta[nextrap-1] > 1.0e-10)
+             {
+              c_l = s[0]/gamma[nextrap-1] ; 
+              c_r = r[0]/beta[nextrap-1] ; 
+             }
+
+        }
+
+
+
+        void extrapolate_tridiagonal(op::ExcitationOperator  <T,3,2>& c_r,op::DeexcitationOperator<V,3,2>& c_l,op::ExcitationOperator  <T,3,2>& hc_r, op::DeexcitationOperator<V,3,2>& hc_l, unique_vector<T>& alpha, unique_vector<T>& beta, unique_vector<T>& gamma)
+        {
+            using slice::all;
+
+            /* calculate alpha(i) = pT(i)hc_rq(i)
+             */ 
+
+             alpha.push_back(scalar(c_l*hc_r)) ;             
+
+             double temp ;
+
+             unique_vector<ExcitationOperator<T,3,2>> r;
+             unique_vector<DeexcitationOperator<V,3,2>> s;
+
+            /* calculate r = hc_r - gamma(i-1)q(i-1) - alpha(i)q(i)
+             */
+
+             r.clear() ;
+             s.clear() ;
+
+           if (nextrap > 0) {
+             r.emplace_back(hc_r) ;
+             r[0] -= alpha[nextrap]*c_r ;
+             r[0] -= gamma[nextrap-1]*old_c_r_p_triples[0] ;
+           }else{
+             r.emplace_back(hc_r) ;
+             r[0] -= alpha[nextrap]*c_r ;
+           }
+
+            /* calculate s = hc_l - beta(i-1)pT(i-1) - alpha(i)pT(i)
+             */
+
+            if (nextrap > 0) {
+             s.emplace_back(hc_l) ;
+             s[0] -= alpha[nextrap]*c_l ;
+             s[0] -= beta[nextrap-1]*old_c_l_p_triples[0] ;
+           }else{
+             s.emplace_back(hc_l) ;
+             s[0] -= alpha[nextrap]*c_l ;
+          }
+
+             temp = scalar(r[0]*s[0]) ; 
+
+             if (abs(temp) > 1.0e-10)
+             {
+               beta.emplace_back (sqrt(aquarius::abs(scalar(r[0]*s[0])))) ;
+             }else
+             {
+               beta.emplace_back (0.0) ;
+             }
+
+             if (beta[nextrap] > 1.0e-10)
+             {
+              gamma.emplace_back (temp/beta[nextrap])  ; 
+             }else
+             {
+              gamma.emplace_back(0.) ; 
+             }
+
+             addVectors(c_r, c_l);
+
+             if (beta[nextrap-1] > 1.0e-10)
+             {
+              c_l = s[0]/gamma[nextrap-1] ; 
+              c_r = r[0]/beta[nextrap-1] ; 
+             }
+
+        }
+
+
+        void extrapolate_tridiagonal(op::ExcitationOperator  <T,2,1>& c_r,op::DeexcitationOperator<V,2,1>& c_l,op::ExcitationOperator  <T,2,1>& hc_r, op::DeexcitationOperator<V,2,1>& hc_l, unique_vector<T>& alpha, unique_vector<T>& beta, unique_vector<T>& gamma)
         {
             using slice::all;
 

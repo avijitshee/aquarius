@@ -30,6 +30,8 @@ __top_builddir__bin_aquarius_SOURCES = \
 	src/cc/ccsdteagf.cxx \
 	src/cc/ccsdteagf_d_t.cxx \
 	src/cc/ccsdtipgf_d_t.cxx \
+	src/cc/ccsdteagf_lanczos_d_t.cxx \
+	src/cc/ccsdtipgf_lanczos_d_t.cxx \
 	src/cc/ccsigma.cxx \
 	src/cc/ccsigma_linsolver.cxx \
 	src/cc/assemble_files.cxx \
